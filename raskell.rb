@@ -1,7 +1,11 @@
+def F(x)
+  x.kind_of?(Proc) ? x : -> { x }
+end
+
 class Object
 
   def lift
-    -> { self }
+    F(self)
   end
 
   def call(*args)
@@ -10,47 +14,72 @@ class Object
 
 end
 
+class Array
+  def take(n)
+    if n == 0
+      []
+    elsif n >= self.length
+      self
+    else
+      self.slice(0, n)
+    end
+  end
+
+  def drop(n)
+    if n == 0
+      self
+    elsif n >= self.length
+      []
+    else
+      self.slice(n, self.length)
+    end
+  end
+end
+
+
 class Proc
-  
   alias_method :standard_ruby_call, :call
   
   # Just a friendly reminder
   # .() is shorthand for .call() 
+  # and self.arity is the number of arguments this Proc takes
+
   def call(*args)
-    arity_difference = args.length - self.arity
-    if arity_difference > 0
-      call_with_too_many_arguments(args)
-    elsif arity_difference < 0
-      call_with_too_few_arguments(args)
+    args = args || []
+
+    args_to_consume = args.take(self.arity)
+    remaining_args = args.drop(self.arity)
+    
+    if self.arity == 0
+      result = self.standard_ruby_call()
+    elsif args.length == 0
+      #interpret application with no arguments on a non-zero-arity function as a no-op
+      return self
+    elsif args_to_consume.length < self.arity
+      #if you have too few arguments, return a lambda asking for more before attempting to re-apply
+      return ->(x) { call( *( args.push(x) ) ) }
     else
-      standard_ruby_call(*args)
+      #otherwise, apply the arguments
+      result = self.standard_ruby_call(*args_to_consume)
     end
+    # if the result is a proc, make sure to unwrap further by recursively calling with any remaining arguments
+    result.kind_of?(Proc) ? result.call(*remaining_args) : result
   end
   
-  def *(proc)
-    ->(x) { self.( proc.( x ) ) }
+  def *(lamb)
+    ->(x) { self.( lamb.( x ) ) }
   end
 
-  def |(proc)
-    ->(x) { proc.( self.( x ) ) }
+  def |(lamb)
+    ->(x) { lamb.( self.( x ) ) }
   end
 
   def <=(val)
     self.(val.())
   end
 
-  def >=(proc)
-    proc.(self.())
-  end
-
-  private
-
-  def call_with_too_many_arguments(args)
-    # TODO later after I add tests
-  end
-
-  def call_with_too_few_arguments(args)
-    # TODO later after I add tests
+  def >=(lamb)
+    lamb.(self.())
   end
 
 end
