@@ -1,4 +1,6 @@
-load '../../raskell.rb'
+load 'lib/core/core.rb'
+load 'lib/core/folds.rb'
+
 require 'singleton'
 
 infinity = Float::INFINITY
@@ -36,8 +38,8 @@ min = ->(x,y) { x <= y ? x : y}
 
 first = -> (l) { l[0] }
 last = -> (l) { l[-1] }
-rest = -> (l) { l[1:-1] }
-init = ->(l) { l[0:-2] }
+rest = -> (l) { l[1..-1] }
+init = ->(l) { l[0..-2] }
 
 cons = ->(el, l) { [el] + l }
 snoc = ->(l, el) { l + [el] }
@@ -49,6 +51,14 @@ slf = -> (f, x) { f.(x,x) }
 foldl = ->(f, u) { Foldl.new([f,u]) }
 foldr = ->(f,u,l) { l.foldr(u) { |el, acc| f.(el, acc) } }
 
+unfoldl = -> (next_fn, stop_fn, seed) { 
+  intermediate_result = seed
+  while !stop_fn.(intermediate_result)
+    intermediate_result = next_fn.(intermediate_result)
+  end
+  intermediate_result
+}
+
 map = ->(f) { foldl.(->(acc,el) { acc.push(f.(el)) }, [])}
 
 sum = foldl.(plus, 0)
@@ -57,11 +67,11 @@ reverse = foldl.(snoc, [])
 
 ands = foldl.(nd, true)
 ors = foldl.(r, false)
-all = ->(f) { foldl(->(acc, el) { f.(el) && acc } }
-any = ->(f) { foldl(->(acc, el) { acc || f.(el) } }
+all = ->(f) { foldl(->(acc, el) { f.(el) && acc }, true) }
+any = ->(f) { foldl(->(acc, el) { acc || f.(el) }, false) }
 maximum = foldl.(max, infinity)
 minimum = foldl.(min, negative_infinity)
-reverse = foldl.(->(acc, el) { cons.(el, acc) }, []) } ## or foldr.(->(el,acc) { snoc.(acc, el) })
+reverse = foldl.(->(acc, el) { cons.(el, acc) }, []) ## or foldr.(->(el,acc) { snoc.(acc, el) })
 filter = ->(f) { foldl.(->(acc,el) { f.(el) ? snoc.(acc,el) : acc }, []) }
 append = ->(l1, l2) { l1 + l2 } 
 flatmap = ->(f) { foldl.(->(acc, el) { plus.(acc, f.el) }, []) }
