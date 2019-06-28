@@ -9,7 +9,7 @@ class Object
   end
 
   def call(*args)
-    self
+    (!args || args.length == 0) ? self : args.map{|f| f.(self) }
   end
 
   def apply(f)
@@ -39,6 +39,11 @@ class Integer
 end
 
 class Array
+
+  def call(*args)
+    (!args || args.length == 0) ? self : self.map{|x| args.map {|f| f.(x) } }
+  end
+
   def take(n)
     if n == 0
       []
@@ -99,18 +104,30 @@ class Proc
   end
   
   def *(lamb)
+    # You, then me
+    # like function composition
     ->(x) { self.( lamb.( x ) ) }
   end
 
   def |(lamb)
+    # Me, then you
+    # like unix pipes
     ->(x) { lamb.( self.( x ) ) }
   end
 
+  def +(lamb)
+    ## later need to check if they have the same arity, once I've fixed the arity function to handle nesting lambdas
+    this = self
+    ->(x) { [this.(x), lamb.(x)] }
+  end
+
   def <=(val)
+    # feed data from the right
     self.(val.())
   end
 
   def >=(lamb)
+    # feed data from the left, assuming I am a wrapped Object of some sort
     lamb.(self.())
   end
 
