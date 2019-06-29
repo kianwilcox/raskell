@@ -7,8 +7,12 @@ op_lookup = ->(op_name) {
 	case op_name
 	when op_name.kind_of?(Array)
 		op_name.last
+	when "not_equal"
+		->(x,y) { nt.(equals.(x,y))}
 	when "equal"
 		equals
+	when "not_eq"
+		->(x,y) { nt.(eq.(x,y))}
 	when "eq"
 		eq
 	when "gte"
@@ -20,7 +24,6 @@ op_lookup = ->(op_name) {
 	when "lt"
 		lt
 	end
-
 }
 
 check = ->(op, is, should_be) { 
@@ -32,11 +35,11 @@ check = ->(op, is, should_be) {
 		success = op_lookup.(op).(is, should_be)
 	rescue Exception => e
 		message += e.message
+		new_exception = Exception.new(message)
+		new_exception.set_backtrace(e.backtrace)
 	end
 	if not(success)
 		puts("F]")
-		new_exception = Exception.new(message)
-		new_exception.set_backtrace(e.backtrace)
 		raise new_exception
 	else
 		print(".") 

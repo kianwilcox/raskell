@@ -1,0 +1,107 @@
+tests = [
+
+  ## Check partial application
+
+  ["streams are equal if their elements are equal",
+
+    ->() { 
+      s1 = [1,2,3,4,5].to_stream
+      s2 = [1,2,3,4,5].to_stream
+      s3 = [5,4,3,2,1].to_stream
+      check.("equal", s1, s2)
+      check.("not_equal", s2, s3)
+    }
+
+  ],
+
+  ["streams and any container that supports to_stream are equal if they are element-wise equal",
+
+    ->() { 
+      s1 = [1,2,3,4,5,6].to_stream
+      s2 = [1,2,3,3,5,6].to_stream
+      
+      l1 = [1,2,3,4,5,6]
+      l2 = [1,2,3,3,5,6]
+      check.("equal", l1 == s1, true)
+      check.("equal", s1 == l1, true)
+
+      check.("equal", l2 == s2, true)
+      check.("equal", s2 == l2, true)
+
+      check.("equal", s1 == l2, false)
+      check.("equal", l2 == s1, false)
+
+    }
+
+  ],
+
+  ["applying the identity function to anything returns anything",
+
+    ->() { 
+      f = Identity.new
+      check.("equal", f.(1), 1)
+    }
+
+  ],
+
+  ["composing the identity function with anything returns anything",
+
+    ->() { 
+      f = ->(x) { 1 }
+      g = Identity.new
+      check.("equal", (f * g).(10), 1)
+      check.("equal", (g * f).(10), 1)
+      check.("equal", (g * g).(10), 10)
+    }
+
+  ],
+
+  ["able to fuse away two streams into an Identity function",
+
+    ->() { 
+      f = to_stream * from_stream
+      g = to_stream * (from_stream * to_stream) * from_stream
+      h = from_stream * (to_stream * from_stream) * to_stream
+      i = to_stream * (from_stream * to_stream) * from_stream
+      ## should be fusing 7 times
+      check.("equal", f.class, Identity)
+      check.("equal", g.class, Identity)
+      check.("equal", h.class, Identity)
+      check.("equal", i.class, Identity)
+    }
+
+  ],
+
+  ["able to fuse away two streams into an Identity function even when to_stream and from_stream have been composed with another lambda",
+
+    ->() { 
+      f = from_stream * ->(x) { x }
+      g = ->(x) { x } * to_stream
+      h = ->(x) { x } | from_stream
+      i = to_stream | ->(x) { x }
+
+      f2 = to_stream * ->(x) { x }
+      g2 = ->(x) { x } * from_stream
+      h2 = ->(x) { x } | from_stream
+      i2 = to_stream | ->(x) { x }
+
+      ## what we really want is to check if there's fusion happening at all
+      ## there should be 4 fusion events below, but are currenlty none
+      check.("equal", (g * f).([1,2,3,4,5].to_stream), [1,2,3,4,5])
+      check.("equal", (h | i).([1,2,3,4,5].to_stream), [1,2,3,4,5])
+
+      check.("equal", (g2 * f2).([1,2,3,4,5].to_stream), [1,2,3,4,5])
+      check.("equal", (h2 | i2).([1,2,3,4,5].to_stream), [1,2,3,4,5])
+    }
+
+  ],
+
+  
+
+
+
+]
+
+
+
+run_tests.(tests)
