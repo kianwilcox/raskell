@@ -1,7 +1,7 @@
 require 'singleton'
 
 ## functions
-id = ->(x) { x }
+id = ->(x) { x } ## Identity.new
 flip = -> (f,x,y) { f.(y,x) }
 slf = -> (f, x) { f.(x,x) }
 
@@ -69,7 +69,10 @@ reverse = foldl.(->(acc, el) { cons.(el, acc) }, []) ## or foldr.(->(el,acc) { s
 
 ## functional combinators - higher-order functions generic over their container
 
-foldl = ->(f,u,l) { l.foldl(u) { |acc, el| f.(acc, el) } } ##->(f, u) { Foldl.new([f,u]) }
+to_stream = ToStream.new()
+from_stream = FromStream.new()
+
+foldl = ->(f, u) { Foldl.new([f,u]) } ## ->(f,u,l) { l.foldl(u) { |acc, el| f.(acc, el) } }
 foldr = ->(f,u,l) { l.foldr(u) { |el, acc| f.(el, acc) } }
 fold = foldl ## we will default folds to be left folds until we have stream fusion in full force
 

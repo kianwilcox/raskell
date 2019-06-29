@@ -1,5 +1,11 @@
+require 'singleton'
+
 def F(x)
   x.kind_of?(Proc) ? x : -> { x }
+end
+
+def Undef
+  include Singleton
 end
 
 class Object
@@ -106,13 +112,21 @@ class Proc
   def *(lamb)
     # You, then me
     # like function composition
-    ->(x) { self.( lamb.( x ) ) }
+    if lamb.kind_of?(Identity)
+      self
+    else
+      ->(x) { self.( lamb.( x ) ) }
+    end
   end
 
   def |(lamb)
     # Me, then you
     # like unix pipes
-    ->(x) { lamb.( self.( x ) ) }
+    if lamb.kind_of?(Identity)
+      self
+    else
+      ->(x) { lamb.( self.( x ) ) }
+    end
   end
 
   def +(lamb)
