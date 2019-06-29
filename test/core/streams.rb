@@ -96,6 +96,82 @@ tests = [
 
   ],
 
+  #TODO: FILL IN THE TESTS BELOW WITH REAL STUFF
+
+  ["composing a ToStream with a normal lambda on both sides returns a proc",
+
+    ->() { 
+      f = Identity.new
+      check.("not_equal", f.(1), 1)
+    }
+
+  ],
+
+  ["piping a ToStream with a normal lambda returns on both sides returns a proc",
+
+    ->() { 
+      f = Identity.new
+      check.("not_equal", f.(1), 1)
+    }
+
+  ],
+
+  ["composing a FromStream with a normal lambda on both sides returns a proc",
+
+    ->() { 
+      f = Identity.new
+      check.("not_equal", f.(1), 1)
+    }
+
+  ],
+
+  ["piping a FromStream with a normal lambda returns on both sides returns a proc",
+
+    ->() { 
+      f = Identity.new
+      check.("not_equal", f.(1), 1)
+    }
+
+  ],
+
+  ["composing an arbitrary number of lambdas on only one side of a ToStream doesn't stop it from being fusable with a ToStream on the other",
+
+    ->() { 
+      f = Identity.new
+      check.("not_equal", f.(1), 1)
+    }
+
+  ],
+
+  ["composing an arbitrary number of lambdas on only one side of a FromStream doesn't stop it from being fusable with a ToStream on the other",
+
+    ->() { 
+      f = Identity.new
+      check.("not_equal", f.(1), 1)
+    }
+
+  ],
+
+  ["piping an arbitrary number of lambdas on only one side of a ToStream doesn't stop it from being fusable with a ToStream on the other",
+
+    ->() { 
+      f = Identity.new
+      check.("not_equal", f.(1), 1)
+    }
+
+  ],
+
+  ["piping an arbitrary number of lambdas on only one side of a FromStream doesn't stop it from being fusable with a ToStream on the other",
+
+    ->() { 
+      f = Identity.new
+      check.("not_equal", f.(1), 1)
+    }
+
+  ],
+
+  
+
   
 
 

@@ -65,7 +65,7 @@ snoc = ->(l, el) { l + [el] }
 uncons = ->(l) { [first.(l), rest.(l)] }
 unsnoc = ->(l) { [init.(l), last.(l)]}
 
-reverse = foldl.(->(acc, el) { cons.(el, acc) }, []) ## or foldr.(->(el,acc) { snoc.(acc, el) }, [])
+
 
 ## functional combinators - higher-order functions generic over their container
 
@@ -83,6 +83,8 @@ unfoldl = -> (next_fn, stop_fn, seed) {
   end
   intermediate_result
 }
+
+reverse = foldl.(->(acc, el) { cons.(el, acc) }, []) ## or foldr.(->(el,acc) { snoc.(acc, el) }, [])
 
 length = foldl.(inc, 0)
 map = ->(f) { foldl.(->(acc,el) { acc.push(f.(el)) }, [])}

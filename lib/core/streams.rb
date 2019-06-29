@@ -48,40 +48,80 @@ end
 class ToStream
   ## Represents a generic to_stream function
 
+  attr_reader :before_function, :after_function
+  def initialize(options={})
+    @before_function = options['before']
+    @after_function = options['after']
+    @before_function && @after_function ? ->(x) { self.(x) } : self
+  end
+
+
   alias_method :standard_kind_of?, :kind_of?
+
   def kind_of?(clazz)
     clazz == "Proc" || standard_kind_of?(clazz)
   end
 
+
   def call(collection)
-    collection.class.to_stream(collection)
+    before = @before_function
+    after = @after_function
+    collection = before.(collection) if before
+    result = collection.class.to_stream(collection)
+    after ? after.(result) : result
+  end
+
+  def join(converter)
+    if converter.class == self.class
+      self.class.new({
+        'before' => self.before_function,
+        'after' => converter.after_function
+      })
+    elsif !converter.after_function && !self.before_function
+      puts "Fused"
+      Identity.new
+    else
+      puts "Fused"
+      ->(xs) { 
+        xs = self.before_function.(xs) if self.before_function
+        xs = converter.after_function.(xs) if converter.after_function
+        xs
+      }
+    end
+  end
+
+  def fuse(before_converter, after_converter)
+    if (before_converter.class == after_converter.class) || (before_converter.after_function == nil && after_converter.before_function == nil)
+      before_converter.join(after_converter)
+    else
+      ->(xs) { after_converter.(self.(before_converter.(xs))) }
+    end
+
   end
 
   def *(lamb)
-    if lamb.kind_of?(FromStream)
+    if lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
       ## then fuse away the streams by just making this the identity function
-      puts "applying stream fusion"
-      Identity.new
-    elsif lamb.kind_of?(ToStream)
-      raise "Can't compose two ToStream functions together"
+      self.fuse(lamb, self)
     elsif lamb.kind_of?(Identity)
       self
+    elsif !self.after_function
+      self.class.new({ 'before' => self.before_function  ?  self.before_function * lamb  :  lamb })
     else
-      ->(x) { self.(lamb.(x)) }
+      ->(xs) { self.(lamb.(xs))}
     end
   end
 
   def |(lamb)
-    if lamb.kind_of?(FromStream)
+    if lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
       ## then fuse away the streams by just making this the identity function
-      puts "applying stream fusion"
-      Identity.new
-    elsif lamb.kind_of?(ToStream)
-      raise "Can't compose two ToStream functions together"
+      self.fuse(self, lamb)
     elsif lamb.kind_of?(Identity)
       self
+    elsif !self.before_function
+      self.class.new({ 'after' => self.after_function  ?  self.after_function | lamb : lamb })
     else
-      ->(x) { self.(lamb.(x)) }
+      ->(xs) { lamb.(self.(xs)) }
     end
   end
 
@@ -92,11 +132,20 @@ class ToStream
 
   def >=(lamb)
     # feed data from the left, assuming I am a wrapped Object of some sort
-    lamb.(self.())
+    lamb.(self)
   end
 end
 
+
 class FromStream
+
+  attr_accessor :before_function, :after_function
+  def initialize(options={})
+    @before_function = options['before']
+    @after_function = options['after']
+    @before_function && @after_function ? ->(x) { self.(x) } : self
+  end
+
 
   alias_method :standard_kind_of?, :kind_of?
   def kind_of?(clazz)
@@ -104,17 +153,12 @@ class FromStream
   end
 
 
-  def initialize(func={})
-    @before_function = func['before']
-    @after_function = func['after']
-  end
-
-  def before?
-    !!@before_function
-  end
-
-  def after?
-    !!@after_function
+  def call(stream)
+    before = @before_function
+    after = @after_function
+    stream = before.(stream) if before
+    result = self.unfold(stream)
+    after ? after.(result) : result
   end
 
   def unfold(stream)
@@ -127,44 +171,58 @@ class FromStream
     result
   end
 
-  def after_fns
-    @after_fns
+  def join(converter)
+    if converter.class == self.class
+      self.class.new({
+        'before' => self.before_function,
+        'after' => converter.after_function
+      })
+    elsif !converter.after_function && !self.before_function
+      puts "Fused"
+      Identity.new
+    else
+      puts "Fused"
+      ->(xs) { 
+        xs = self.before_function.(xs) if self.before_function
+        xs = converter.after_function.(xs) if converter.after_function
+        xs
+      }
+    end
   end
 
-  def before_fns
-    @before_fns
+  def fuse(before_converter, after_converter)
+    if (before_converter.class == after_converter.class) || (before_converter.after_function == nil && after_converter.before_function == nil)
+      before_converter.join(after_converter)
+    else
+      ->(xs) { after_converter.(self.(before_converter.(xs))) }
+    end
+
   end
 
   def *(lamb)
-    if lamb.kind_of?(ToStream)
+    if lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
       ## then fuse away the streams by just making this the identity function
-      puts "applying stream fusion"
-      Identity.new
-    elsif lamb.kind_of?(FromStream)
-      raise "Can't compose two FromStream functions together"
+      self.fuse(lamb, self)
     elsif lamb.kind_of?(Identity)
       self
+    elsif !self.after_function
+      self.class.new({ 'before' => self.before_function  ?  self.before_function * lamb  :  lamb })
     else
-      ->(x) { self.(lamb.(x)) }
+      ->(xs) { self.(lamb.(xs))}
     end
   end
 
   def |(lamb)
-    if lamb.kind_of?(ToStream)
+    if lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
       ## then fuse away the streams by just making this the identity function
-      puts "applying stream fusion"
-      Identity.new
-    elsif lamb.kind_of?(FromStream)
-      raise "Can't compose two FromStream functions together"
+      self.fuse(self, lamb)
     elsif lamb.kind_of?(Identity)
       self
+    elsif !self.before_function
+      self.class.new({ 'after' => self.after_function  ?  self.after_function | lamb : lamb })
     else
-      ->(x) { self.(lamb.(x)) }
+      ->(xs) { lamb.(self.(xs)) }
     end
-  end
-
-  def call(stream)
-    self.unfold(stream)
   end
 
   def <=(val)
