@@ -1,7 +1,7 @@
 require 'singleton'
 
 ## functions
-id = ->(x) { x } ## Identity.new
+id = Identity.new ## ->(x) { x }
 flip = -> (f,x,y) { f.(y,x) }
 slf = -> (f, x) { f.(x,x) }
 

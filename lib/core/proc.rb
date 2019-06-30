@@ -33,6 +33,8 @@ class Proc
     # like function composition
     if lamb.kind_of?(Identity)
       self
+    elsif lamb.class != Proc
+      lamb | self
     else
       ->(x) { self.( lamb.( x ) ) }
     end
@@ -43,6 +45,8 @@ class Proc
     # like unix pipes
     if lamb.kind_of?(Identity)
       self
+    elsif lamb.class != Proc
+      lamb * self
     else
       ->(x) { lamb.( self.( x ) ) }
     end

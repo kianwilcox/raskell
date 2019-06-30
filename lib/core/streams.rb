@@ -100,11 +100,11 @@ class ToStream
   end
 
   def *(lamb)
-    if lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
+    if lamb.kind_of?(Identity)
+      self
+    elsif lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
       ## then fuse away the streams by just making this the identity function
       self.fuse(lamb, self)
-    elsif lamb.kind_of?(Identity)
-      self
     elsif !self.after_function
       self.class.new({ 'before' => self.before_function  ?  self.before_function * lamb  :  lamb })
     else
@@ -113,11 +113,11 @@ class ToStream
   end
 
   def |(lamb)
-    if lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
+    if lamb.kind_of?(Identity)
+      self
+    elsif lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
       ## then fuse away the streams by just making this the identity function
       self.fuse(self, lamb)
-    elsif lamb.kind_of?(Identity)
-      self
     elsif !self.before_function
       self.class.new({ 'after' => self.after_function  ?  self.after_function | lamb : lamb })
     else
@@ -200,11 +200,11 @@ class FromStream
   end
 
   def *(lamb)
-    if lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
+    if lamb.kind_of?(Identity)
+      self
+    elsif lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
       ## then fuse away the streams by just making this the identity function
       self.fuse(lamb, self)
-    elsif lamb.kind_of?(Identity)
-      self
     elsif !self.after_function
       self.class.new({ 'before' => self.before_function  ?  self.before_function * lamb  :  lamb })
     else
@@ -213,11 +213,11 @@ class FromStream
   end
 
   def |(lamb)
-    if lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
+    if lamb.kind_of?(Identity)
+      self
+    elsif lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
       ## then fuse away the streams by just making this the identity function
       self.fuse(self, lamb)
-    elsif lamb.kind_of?(Identity)
-      self
     elsif !self.before_function
       self.class.new({ 'after' => self.after_function  ?  self.after_function | lamb : lamb })
     else
