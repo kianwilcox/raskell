@@ -1,5 +1,5 @@
 class Integer
-  def foldr(func, unit)
+  def foldl(func, unit)
     i = 0
     while i <= self
       unit = func.(unit, i)
@@ -8,10 +8,10 @@ class Integer
     unit
   end
 
-  def foldl(func, unit)
+  def foldr(func, unit)
     i = self
     while i >= 0
-      unit = func.(unit, i)
+      unit = func.(i, unit)
       i-=1
     end
     unit

@@ -35,7 +35,7 @@ tests = [
 
   ],
 
-  ["applying the identity function to anything returns anything",
+  ["applying the Identity.new function to anything returns anything",
 
     ->() { 
       f = Identity.new
@@ -44,7 +44,7 @@ tests = [
 
   ],
 
-  ["composing the identity function with anything returns anything",
+  ["composing the Identity.new function with anything returns anything",
 
     ->() { 
       f = ->(x) { 1 }
@@ -56,7 +56,7 @@ tests = [
 
   ],
 
-  ["able to fuse away two streams into an Identity function",
+  ["able to fuse away two streams into an Identity.new function",
 
     ->() { 
       f = F.to_stream * F.from_stream
@@ -72,7 +72,7 @@ tests = [
 
   ],
 
-  ["able to fuse away two streams into an Identity function even when F.to_stream and F.from_stream have been composed with another lambda",
+  ["able to fuse away two streams into an Identity.new function even when F.to_stream and F.from_stream have been composed with another lambda",
 
     ->() { 
       f = F.from_stream * ->(x) { x }

@@ -8,5 +8,3 @@ load 'lib/core/undef.rb'
 load 'lib/core/folds.rb'
 load 'lib/core/f.rb'
 
-load 'lib/collections/generic.rb'
-

@@ -130,7 +130,7 @@ class ToStream
     if lamb.kind_of?(Identity)
       self
     elsif lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
-      ## then fuse away the streams by just making this the identity function
+      ## then fuse away the streams by just making this the Identity.new function
       self.fuse(lamb, self)
     elsif !self.after_function
       self.class.new({ 'before' => self.before_function  ?  self.before_function * lamb  :  lamb })
@@ -143,7 +143,7 @@ class ToStream
     if lamb.kind_of?(Identity)
       self
     elsif lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
-      ## then fuse away the streams by just making this the identity function
+      ## then fuse away the streams by just making this the Identity.new function
       self.fuse(self, lamb)
     elsif !self.before_function
       self.class.new({ 'after' => self.after_function  ?  self.after_function | lamb : lamb })
@@ -231,7 +231,7 @@ class FromStream
     if lamb.kind_of?(Identity)
       self
     elsif lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
-      ## then fuse away the streams by just making this the identity function
+      ## then fuse away the streams by just making this the Identity.new function
       self.fuse(lamb, self)
     elsif !self.after_function
       self.class.new({ 'before' => self.before_function  ?  self.before_function * lamb  :  lamb })
@@ -244,7 +244,7 @@ class FromStream
     if lamb.kind_of?(Identity)
       self
     elsif lamb.kind_of?(FromStream) || lamb.kind_of?(ToStream) 
-      ## then fuse away the streams by just making this the identity function
+      ## then fuse away the streams by just making this the Identity.new function
       self.fuse(self, lamb)
     elsif !self.before_function
       self.class.new({ 'after' => self.after_function  ?  self.after_function | lamb : lamb })

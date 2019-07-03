@@ -1,11 +1,25 @@
 class Array
 
   def fmap(fn)
-    map(fn)
+    map {|x| fn.(x) }
   end
 
   def call(*args)
-    !args || args.length == 0 || !self.all? { |x| x.kind_of?(Proc) } ? self : (self.drop(1).reduce(self.first) { |new_fn, func| new_fn + func }).(*args)
+    #functions = self.map { |x| x.kind_of?(Proc) ? self : ->() { x } }
+    if !args || args.length == 0 || !self.any? { |x| x.kind_of?(Proc) }
+      self
+    else
+      unit = self.first.kind_of?(Proc) ? self.first : ->() { self.first }
+      function = self.drop(1).reduce(unit) do |new_fn, func| 
+        func_to_add = func.kind_of?(Proc) ? func : ->() { func }
+        new_fn + func_to_add
+      end
+      while args.length != 0
+        function = function.(args.first)
+        args = args.drop(1)
+      end
+      function
+    end
   end
 
   def take(n)
@@ -52,4 +66,10 @@ class Array
   def ==(obj)
     obj.kind_of?(Stream) ? self.to_stream == obj : standard_equals(obj)
   end
+
+  alias_method :standard_triple_equals, :===
+  def ===(obj)
+    obj.kind_of?(Stream) ? self.to_stream === obj : standard_triple_equals(obj)
+  end
+  
 end
