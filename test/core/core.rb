@@ -70,18 +70,14 @@ tests = [
 
   ## Check calling on arrays and other eachable objects
 
-  ["treating an array as a function and calling it with arguments assumed the arguments are functions, and applies the values in the array to them in turn",
+  ["treating an array as a function and calling it with arguments passes those arguments to the functions in each cell of the array",
 
     ->() { 
       f = ->(x) { x + x }
       g = ->(x) { x * x }
 
-      check.("equal", [1,2,3].(f), [2,4,6])
-      check.("equal", [1,2,3].(g), [1,4,9])
-      check.("equal", [1,2,3].(f, g), [[2,1], [4,4], [6,9]])
-      check.("equal", [1,2,3].(f + g), [[2,1], [4,4], [6,9]])
-      check.("equal", [1,2,3].(f, g, f + g), [[2,1], [4,4], [6,9]])
-      check.("equal", [1,2,3].(f, g, f + g), [[2,1, [2,1]], [4,4, [4,4]], [6,9, [6,9]]])
+      check.("equal", [f,g].(5), [10,25])
+      check.("equal", (f + g).(5), [10, 25])
     }
 
   ],
@@ -90,16 +86,22 @@ tests = [
 
   ## Check calling on objects
 
-  ["adding two lambdas results in a lambda that, when applied, yields a pair of results, one for each lambda",
+  ["adding lambdas results in a lambda that, when applied, yields a list of results, one for each lambda",
 
     ->() { 
-      f = ->(x) { x + x }
-      g = ->(x) { x * x }
+      f = ->(x) { x }
+      g = ->(x) { x + x }
+      h = ->(x) { x * x }
       
-      check.("equal", 1.(f), 2)
-      check.("equal", 3.(g), 9)
-      check.("equal", 3.(f,g), [6,9])
-      check.("equal", 3.(f + g), [6,9])
+      check.("equal", f.(3), 3)
+      check.("equal", g.(3), 6)
+      check.("equal", h.(3), 9)
+      check.("equal", [f,g].(3), [3,6])
+      check.("equal", (f + g).(3), [3,6])
+      check.("equal", [f,g,h].(3), [3,6,9])
+      check.("equal", ((f + g) + h).(3), [3,6,9])
+      check.("equal", (f + (g + h)).(3), [3,6,9])
+      check.("equal", ((f + g) + (h + h)).(3), [3,6,9,9])
     }
 
   ],
@@ -107,5 +109,4 @@ tests = [
 ]
 
 
-
-run_tests.(tests)
+DoubleCheck.new(tests).run

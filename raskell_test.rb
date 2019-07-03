@@ -1,3 +1,1 @@
-require 'raskell'
-
-
+load 'test/raskell.rb'

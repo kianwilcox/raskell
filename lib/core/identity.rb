@@ -1,7 +1,7 @@
 class Identity
   alias_method :standard_kind_of?, :kind_of?
   def kind_of?(clazz)
-    clazz == "Proc" || standard_kind_of?(clazz)
+    clazz == Proc || standard_kind_of?(clazz)
   end
 
   def call(args)

@@ -1,7 +1,11 @@
 class Array
 
+  def fmap(fn)
+    map(fn)
+  end
+
   def call(*args)
-    (!args || args.length == 0) ? self : self.map{|x| args.map {|f| f.(x) } }
+    !args || args.length == 0 || !self.all? { |x| x.kind_of?(Proc) } ? self : (self.drop(1).reduce(self.first) { |new_fn, func| new_fn + func }).(*args)
   end
 
   def take(n)
@@ -25,13 +29,13 @@ class Array
   end
 
   def foldr(func, unit)
-    (self.length-1).foldr(->(idx, acc) { func(self[idx], acc) }, unit)
+    (self.length-1).foldr(->(idx, acc) { func.(self[idx], acc) }, unit)
   end
 
   def foldl(func, unit)
-    (self.length-1).foldl(->(idx, acc) { func(self[idx], acc) }, unit)
+    (self.length-1).foldl(->(acc, idx) { func.(acc, self[idx]) }, unit)
   end
-  
+
   def self.next_item
     ->(xs) { xs.empty? ? [:done] : [:item, xs.first, Array.to_stream(xs.drop(1))] }
   end

@@ -1,15 +1,19 @@
 class Object
 
+  def fmap(fn)
+  	fn.(self)
+  end
+
   def lift
-    F(self)
+    ->() { self }
   end
 
   def call(*args)
-    (!args || args.length == 0) ? self : args.map{|f| f.(self) }
+  	self
   end
 
-  def apply(f)
-    f.(self)
+  def apply(fn)
+    fn.(self)
   end
 
 end

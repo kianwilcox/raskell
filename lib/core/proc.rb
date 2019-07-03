@@ -1,6 +1,7 @@
 
 class Proc
   alias_method :standard_ruby_call, :call
+  attr_accessor :is_tupled
   
   # Just a friendly reminder
   # .() is shorthand for .call() 
@@ -55,7 +56,20 @@ class Proc
   def +(lamb)
     ## later need to check if they have the same arity, once I've fixed the arity function to handle nesting lambdas
     this = self
-    ->(x) { [this.(x), lamb.(x)] }
+    
+    result = ->(xs) { 
+      if lamb.is_tupled && this.is_tupled 
+        this.(xs) + lamb.(xs)
+      elsif lamb.is_tupled
+        [this.(xs)] + lamb.(xs)
+      elsif this.is_tupled
+        this.(xs) + [lamb.(xs)]
+      else
+        [this.(xs),lamb.(xs)] 
+      end
+    }
+    result.is_tupled = true
+    result
   end
 
   def <=(val)

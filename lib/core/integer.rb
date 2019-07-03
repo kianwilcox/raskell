@@ -11,7 +11,7 @@ class Integer
   def foldl(func, unit)
     i = self
     while i >= 0
-      unit = func.(i, unit)
+      unit = func.(unit, i)
       i-=1
     end
     unit

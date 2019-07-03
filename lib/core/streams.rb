@@ -11,11 +11,28 @@ class Stream
       stream = stream.to_stream
       next1 = self.next_item
       next2 = stream.next_item
-      equal_so_far = next1 == next2 || next1[1] == next2[1]
+      equal_so_far = next1 == next2 || (next1.first != :skip && next1[1] == next2[1])
       while equal_so_far && !(next1 == [:done] || next2 == [:done])
         next1 = next1.last.next_item
         next2 = next2.last.next_item
         equal_so_far = next1 == next2
+      end
+      equal_so_far
+    else
+      false
+    end
+  end
+
+  def ===(stream)
+    if stream.respond_to?(:to_stream)
+      stream = stream.to_stream
+      next1 = self.next_item
+      next2 = stream.next_item
+      equal_so_far = next1 == next2 || (next1.first != :skip && next1[1] === next2[1])
+      while equal_so_far && !(next1 == [:done] || next2 == [:done])
+        next1 = next1.last.next_item
+        next2 = next2.last.next_item
+        equal_so_far = next1 === next2
       end
       equal_so_far
     else
@@ -43,6 +60,16 @@ class Stream
     @next_item.(@state)
   end
 
+  def foldl(func, unit)
+    from_stream.foldl(func, unit)
+  end
+
+end
+
+class StreamTransducer
+  def initialize(*fns)
+    @functions = fns
+  end
 end
 
 class ToStream
@@ -59,7 +86,7 @@ class ToStream
   alias_method :standard_kind_of?, :kind_of?
 
   def kind_of?(clazz)
-    clazz == "Proc" || standard_kind_of?(clazz)
+    clazz == Proc || standard_kind_of?(clazz)
   end
 
 
@@ -149,7 +176,7 @@ class FromStream
 
   alias_method :standard_kind_of?, :kind_of?
   def kind_of?(clazz)
-    clazz == "Proc" || standard_kind_of?(clazz)
+    clazz == Proc || standard_kind_of?(clazz)
   end
 
 
@@ -163,6 +190,7 @@ class FromStream
 
   def unfold(stream)
     result = []
+    stream = stream.to_stream
     next_val = stream.next_item
     while next_val.first != :done
       result.push(next_val[1]) if next_val.first == :item

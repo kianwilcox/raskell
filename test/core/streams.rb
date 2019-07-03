@@ -14,7 +14,7 @@ tests = [
 
   ],
 
-  ["streams and any container that supports to_stream are equal if they are element-wise equal",
+  ["streams and any container that supports F.to_stream are equal if they are element-wise equal",
 
     ->() { 
       s1 = [1,2,3,4,5,6].to_stream
@@ -22,14 +22,14 @@ tests = [
       
       l1 = [1,2,3,4,5,6]
       l2 = [1,2,3,3,5,6]
-      check.("equal", l1 == s1, true)
-      check.("equal", s1 == l1, true)
+      check.("equal", l1, s1)
+      check.("equal", s1, l1)
 
-      check.("equal", l2 == s2, true)
-      check.("equal", s2 == l2, true)
+      check.("equal", l2, s2)
+      check.("equal", s2, l2)
 
-      check.("equal", s1 == l2, false)
-      check.("equal", l2 == s1, false)
+      check.("not_equal", s1, l2)
+      check.("not_equal", l2, s1)
 
     }
 
@@ -59,10 +59,10 @@ tests = [
   ["able to fuse away two streams into an Identity function",
 
     ->() { 
-      f = to_stream * from_stream
-      g = to_stream * (from_stream * to_stream) * from_stream
-      h = from_stream * (to_stream * from_stream) * to_stream
-      i = to_stream * (from_stream * to_stream) * from_stream
+      f = F.to_stream * F.from_stream
+      g = F.to_stream * (F.from_stream* F.to_stream) * F.from_stream
+      h = F.from_stream * (F.to_stream* F.from_stream) * F.to_stream
+      i = F.to_stream * (F.from_stream* F.to_stream) * F.from_stream
       ## should be fusing 7 times
       check.("equal", f.class, Identity)
       check.("equal", g.class, Identity)
@@ -72,18 +72,18 @@ tests = [
 
   ],
 
-  ["able to fuse away two streams into an Identity function even when to_stream and from_stream have been composed with another lambda",
+  ["able to fuse away two streams into an Identity function even when F.to_stream and F.from_stream have been composed with another lambda",
 
     ->() { 
-      f = from_stream * ->(x) { x }
-      g = ->(x) { x } * to_stream
-      h = ->(x) { x } | from_stream
-      i = to_stream | ->(x) { x }
+      f = F.from_stream * ->(x) { x }
+      g = ->(x) { x } * F.to_stream
+      h = ->(x) { x } | F.from_stream
+      i = F.to_stream | ->(x) { x }
 
-      f2 = to_stream * ->(x) { x }
-      g2 = ->(x) { x } * from_stream
-      h2 = ->(x) { x } | from_stream
-      i2 = to_stream | ->(x) { x }
+      f2 = F.to_stream * ->(x) { x }
+      g2 = ->(x) { x } * F.from_stream
+      h2 = ->(x) { x } | F.from_stream
+      i2 = F.to_stream | ->(x) { x }
 
       ## what we really want is to check if there's fusion happening at all
       ## there should be 4 fusion events below, but are currenlty none
@@ -101,8 +101,8 @@ tests = [
   ["composing a ToStream with a normal lambda on both sides returns a proc",
 
     ->() { 
-      f = Identity.new
-      check.("not_equal", f.(1), 1)
+      f = ->(x) { x } * F.to_stream * ->(x) { x }
+      check.("equal", f.class, Proc)
     }
 
   ],
@@ -110,8 +110,8 @@ tests = [
   ["piping a ToStream with a normal lambda returns on both sides returns a proc",
 
     ->() { 
-      f = Identity.new
-      check.("not_equal", f.(1), 1)
+      f = ->(x) { x } | F.to_stream | ->(x) { x }
+      check.("equal", f.class, Proc)
     }
 
   ],
@@ -119,8 +119,8 @@ tests = [
   ["composing a FromStream with a normal lambda on both sides returns a proc",
 
     ->() { 
-      f = Identity.new
-      check.("not_equal", f.(1), 1)
+      f = ->(x) { x } * F.from_stream * ->(x) { x }
+      check.("equal", f.class, Proc)
     }
 
   ],
@@ -128,17 +128,22 @@ tests = [
   ["piping a FromStream with a normal lambda returns on both sides returns a proc",
 
     ->() { 
-      f = Identity.new
-      check.("not_equal", f.(1), 1)
+      f = ->(x) { x } | F.from_stream | ->(x) { x }
+      check.("equal", f.class, Proc)
     }
 
   ],
 
-  ["composing an arbitrary number of lambdas on only one side of a ToStream doesn't stop it from being fusable with a ToStream on the other",
+  ["composing an arbitrary number of lambdas on only one side of a ToStream doesn't stop it from being fusable with a FromStream on the other",
 
     ->() { 
-      f = Identity.new
-      check.("not_equal", f.(1), 1)
+      f = F.to_stream *  F.map.(->(y) { y*2 }) *  F.map.(->(x) { x+10 })
+      g = F.from_stream
+      check.("equal", f.class, ToStream)
+      check.("equal", g.(f.([1])), [22])
+      ## there should be a check for fusion here
+      check.("equal", (g * f).class, Proc)
+      check.("equal", (f | g).class, Proc)
     }
 
   ],
@@ -146,17 +151,27 @@ tests = [
   ["composing an arbitrary number of lambdas on only one side of a FromStream doesn't stop it from being fusable with a ToStream on the other",
 
     ->() { 
-      f = Identity.new
-      check.("not_equal", f.(1), 1)
+      f = F.from_stream *  F.map.(->(y) { y*2 }) *  F.map.(->(x) { x+10 })
+      g = F.to_stream
+      check.("equal", f.class, FromStream)
+      check.("equal", g.(f.([1])), [22])
+      ## there should be a check for fusion on each of the following
+      check.("equal", (g * f).class, Proc)
+      check.("equal", (f | g).class, Proc)
     }
 
   ],
 
-  ["piping an arbitrary number of lambdas on only one side of a ToStream doesn't stop it from being fusable with a ToStream on the other",
+  ["piping an arbitrary number of lambdas on only one side of a ToStream doesn't stop it from being fusable with a FromStream on the other",
 
     ->() { 
-      f = Identity.new
-      check.("not_equal", f.(1), 1)
+      f = F.to_stream |  F.map.(->(y) { y*2 }) |  F.map.(->(x) { x+10 })
+      g = F.from_stream
+      check.("equal", f.class, ToStream)
+      check.("equal", g.(f.([1])), [12])
+      ## there should be a check for fusion here
+      check.("equal", (f * g).class, Proc)
+      check.("equal", (g | f).class, Proc)
     }
 
   ],
@@ -164,13 +179,23 @@ tests = [
   ["piping an arbitrary number of lambdas on only one side of a FromStream doesn't stop it from being fusable with a ToStream on the other",
 
     ->() { 
-      f = Identity.new
-      check.("not_equal", f.(1), 1)
+      f = F.from_stream |  F.map.(->(y) { y*2 }) |  F.map.(->(x) { x+10 })
+      g = F.to_stream
+      check.("equal", f.class, FromStream)
+      check.("equal", g.(f.([1])), [12])
+      ## there should be a check for fusion here
+      check.("equal", (f * g).class, Proc)
+      check.("equal", (g | f).class, Proc)
     }
 
   ],
 
-  
+  ## Next step, StreamTransducers
+  # first, confirm that foldl
+
+
+
+
 
   
 
@@ -179,5 +204,4 @@ tests = [
 ]
 
 
-
-run_tests.(tests)
+DoubleCheck.new(tests).run

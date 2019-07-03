@@ -3,16 +3,16 @@ tests = [
 
     ->() { 
       f1 = sum + product + maximum + minimum
-      check.("equal", f1.([1,2,3,4,5], [15, 120, 5, 1])
+      check.("equal", f1.([1,2,3,4,5], [15, 120, 5, 1]))
 
       f2 = (sum + product) + (maximum + minimum)
-      check.("equal", f2.([1,2,3,4,5], [15, 120, 5, 1])
+      check.("equal", f2.([1,2,3,4,5], [15, 120, 5, 1]))
 
       f3 = (((sum + product) + maximum) + minimum)
-      check.("equal", f3.([1,2,3,4,5], [15, 120, 5, 1])
+      check.("equal", f3.([1,2,3,4,5], [15, 120, 5, 1]))
 
       f4 = (sum + (product + (maximum + minimum)))
-      check.("equal", f4.([1,2,3,4,5], [15, 120, 5, 1])
+      check.("equal", f4.([1,2,3,4,5], [15, 120, 5, 1]))
     }
 
   ],
@@ -40,8 +40,6 @@ tests = [
 
   ],
 
-
-=begin
   ["composing a splittable function with a foldl should create a new foldl that traverses the object only once",
 
     ->() { 
@@ -70,10 +68,8 @@ tests = [
     }
 
   ]
-=end
 
 ]
 
 
-
-run_tests.(tests)
+DoubleCheck.new(tests).run

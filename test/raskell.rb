@@ -1,0 +1,6 @@
+load 'raskell.rb'
+load 'apps/double_check/double_check.rb'
+load 'test/core/core.rb'
+load 'test/core/folds.rb'
+load 'test/core/streams.rb'
+load 'test/collections/generics.rb'

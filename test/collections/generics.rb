@@ -42,7 +42,7 @@ snoc = ->(l, el) { l + [el] }
 uncons = ->(l) { [first.(l), rest.(l)] }
 unsnoc = ->(l) { [init.(l), last.(l)]}
 
-slf = -> (f, x) { f.(x,x) }
+slf = F.-> (f, x) { f.(x,x) }
 foldl = ->(f, u) { Foldl.new([f,u]) }
 foldr = ->(f,u,l) { l.foldr(u) { |el, acc| f.(el, acc) } }
 
@@ -64,8 +64,8 @@ ands = foldl.(nd, true)
 ors = foldl.(r, false)
 all = ->(f) { foldl(->(acc, el) { f.(el) && acc }, true) }
 any = ->(f) { foldl(->(acc, el) { acc || f.(el) }, false) }
-maximum = foldl.(max, infinity)
-minimum = foldl.(min, negative_infinity)
+maximum = foldl.(max, F.infinity)
+minimum = foldl.(min, F.negative_infinity)
 reverse = foldl.(->(acc, el) { cons.(el, acc) }, []) ## or foldr.(->(el,acc) { snoc.(acc, el) })
 filter = ->(f) { foldl.(->(acc,el) { f.(el) ? snoc.(acc,el) : acc }, []) }
 append = ->(l1, l2) { l1 + l2 } 
@@ -75,7 +75,7 @@ enconcat = ->(l, el, r) { l + [el] + r }
 
 replace = ->(toReplace, toReplaceWith) {map.(->(x) { x == toReplace ? toReplaceWith : x })}
 replaceWith = ->(toReplaceWith, toReplace) { map.(->(x) { x == toReplace ? toReplaceWith : x }) }
-replaceByIf = ->(replace_fn, should_replace_fn) { map.( ->(x) { should_replace_fn.(x) ? replace_fn.(x) : x } ) }
+replaceByIf = F.->(replace_fn, should_replace_fn) { map.( ->(x) { should_replace_fn.(x) ? replace_fn.(x) : x } ) }
 
 
 intercalate = #->(el) { init.(foldl.(, []))}
@@ -182,7 +182,7 @@ tests = [
   ["id.(x) equals x",
 
     ->() { 
-      f = id
+      f = F.id
       check.("equal", f.(1), 1)
       check.("equal", f.(true), true)
       check.("equal", f.([1,2,3]), [1,2,3])
@@ -193,7 +193,7 @@ tests = [
   ["flip.(->(x,y) { x - y}).(2,3) equals 1",
 
     ->() { 
-      f = flip.(->(x,y) { x - y })
+      f = F.flip.(->(x,y) { x - y })
       check.("equal", f.(2,3), 1)
     }
 
@@ -202,7 +202,7 @@ tests = [
   ["slf.(->(x,y) { x * y}).(3) equals 9",
 
     ->() { 
-      f = slf.(->(x,y) { x * y})
+      f = F.slf.(->(x,y) { x * y})
       check.("equal", f.(3), 9)
     }
 
@@ -211,7 +211,7 @@ tests = [
   ["fix.(->(x) { x < 5  ?  x  :  x - 1 }).(10) equals 4",
 
     ->() { 
-      f = fix.(->(x) { x < 5  ?  x  :  x - 1 })
+      f = F.fix.(->(x) { x < 5  ?  x  :  x - 1 })
       check.("equal", f.(10), 4)
     }
 
@@ -223,7 +223,7 @@ tests = [
   ["inc.(1) equals 2",
 
     ->() { 
-      f = inc
+      f = F.inc
       check.("equal", f.(1), 2)
     }
 
@@ -232,7 +232,7 @@ tests = [
   ["dec.(1) equals 0",
 
     ->() { 
-      f = dec
+      f = F.dec
       check.("equal", f.(1), 0)
     }
 
@@ -241,7 +241,7 @@ tests = [
   ["plus.(1,2) equals 3",
 
     ->() { 
-      f = plus
+      f = F.plus
       check.("equal", f.(1,2), 3)
     }
 
@@ -250,7 +250,7 @@ tests = [
   ["times(3,2) equals 6",
 
     ->() { 
-      f = times
+      f = F.times
       check.("equal", f.(3,2), 6)
     }
 
@@ -259,7 +259,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -268,7 +268,7 @@ tests = [
   ["sub_by(2,7) equals 5",
 
     ->() { 
-      f = sub_by
+      f = F.sub_by
       check.("equal", f.(2,7), 5)
     }
 
@@ -277,7 +277,7 @@ tests = [
   ["div_from(6,2) equals 3",
 
     ->() { 
-      f = div_from
+      f = F.div_from
       check.("equal", f.(6,2), 3)
     }
 
@@ -286,26 +286,26 @@ tests = [
   ["div_by(2,10) equals 5",
 
     ->() { 
-      f = div_by
+      f = F.div_by
       check.("equal", f.(2,10), 5)
     }
 
   ],
 
-  ["sub_from(infinity,2) equals infinity",
+  ["sub_from(F.infinity,2) equals F.infinity",
 
     ->() { 
-      f = sub_from
-      check.("equal", f.(infinity,2), infinity)
+      f = F.sub_from
+      check.("equal", f.(F.infinity,2), F.infinity)
     }
 
   ],
 
-  ["sub_from(negative_infinity,2) equals negative_infinity",
+  ["sub_from(F.negative_infinity,2) equals F.negative_infinity",
 
     ->() { 
-      f = plus
-      check.("equal", f.(negative_infinity,2), negative_infinity)
+      f = F.plus
+      check.("equal", f.(F.negative_infinity,2), F.negative_infinity)
     }
 
   ],
@@ -320,7 +320,7 @@ tests = [
   ["max(5,2) is 5",
 
     ->() { 
-      f = max
+      f = F.max
       check.("equal", f.(5,2), 5)
     }
 
@@ -329,26 +329,26 @@ tests = [
   ["max(2,5) is 5",
 
     ->() { 
-      f = max
+      f = F.max
       check.("equal", f.(2,5), 5)
     }
 
   ],
 
-  ["max(infinity,5) is infinity",
+  ["max(F.infinity,5) is F.infinity",
 
     ->() { 
-      f = max
-      check.("equal", f.(infinity,5), infinity)
+      f = F.max
+      check.("equal", f.(F.infinity,5), F.infinity)
     }
 
   ],
 
-  ["max(2,negative_infinity) is 2",
+  ["max(2, F.negative_infinity) is 2",
 
     ->() { 
-      f = max
-      check.("equal", f.(2,negative_infinity), 2)
+      f = F.max
+      check.("equal", f.(2, F.negative_infinity), 2)
     }
 
   ],
@@ -356,7 +356,7 @@ tests = [
   ["min(5,2) is 2",
 
     ->() { 
-      f = min
+      f = F.min
       check.("equal", f.(5,2), 2)
     }
 
@@ -365,26 +365,26 @@ tests = [
   ["min(2,5) is 2",
 
     ->() { 
-      f = min
+      f = F.min
       check.("equal", f.(2,5), 2)
     }
 
   ],
 
-  ["min(infinity,5) is infinity",
+  ["min(F.infinity,5) is F.infinity",
 
     ->() { 
-      f = min
-      check.("equal", f.(infinity,5), 5)
+      f = F.min
+      check.("equal", f.(F.infinity,5), 5)
     }
 
   ],
 
-  ["min(2,negative_infinity) is 2",
+  ["min(2, F.negative_infinity) is 2",
 
     ->() { 
-      f = min
-      check.("equal", f.(2,negative_infinity), negative_infinity)
+      f = F.min
+      check.("equal", f.(2, F.negative_infinity), F.negative_infinity)
     }
 
   ],
@@ -396,7 +396,7 @@ tests = [
   ["gt(5,2) is true",
 
     ->() { 
-      f = gt
+      f = F.gt
       check.("equal", f.(5,2), true)
     }
 
@@ -405,7 +405,7 @@ tests = [
   ["gt(5,5) is false",
 
     ->() { 
-      f = gt
+      f = F.gt
       check.("equal", f.(5,5), false)
     }
 
@@ -414,17 +414,17 @@ tests = [
   ["gt(4,5) is false",
 
     ->() { 
-      f = gt
+      f = F.gt
       check.("equal", f.(4,5), false)
     }
 
   ],
 
-  ["gt(infinity,500000) is true",
+  ["gt(F.infinity,500000) is true",
 
     ->() { 
-      f = gt
-      check.("equal", f.(infinity,500000), true)
+      f = F.gt
+      check.("equal", f.(F.infinity,500000), true)
     }
 
   ],
@@ -432,26 +432,26 @@ tests = [
   ["gt(500000,infinity) is false",
 
     ->() { 
-      f = gt
-      check.("equal", f.(500000, infinity), false)
+      f = F.gt
+      check.("equal", f.(500000, F.infinity), false)
     }
 
   ],
 
-  ["gt(negative_infinity,-500000) is false",
+  ["gt(F.negative_infinity,-500000) is false",
 
     ->() { 
-      f = gt
-      check.("equal", f.(negative_infinity,-500000), false)
+      f = F.gt
+      check.("equal", f.(F.negative_infinity,-500000), false)
     }
 
   ],
 
-  ["gt(-500000,negative_infinity) is true",
+  ["gt(-500000, F.negative_infinity) is true",
 
     ->() { 
-      f = gt
-      check.("equal", f.(-500000, negative_infinity), true)
+      f = F.gt
+      check.("equal", f.(-500000, F.negative_infinity), true)
     }
 
   ],
@@ -459,7 +459,7 @@ tests = [
   ["gte(5,2) is true",
 
     ->() { 
-      f = gte
+      f = F.gte
       check.("equal", f.(5,2), true)
     }
 
@@ -468,7 +468,7 @@ tests = [
   ["gte(5,5) is true",
 
     ->() { 
-      f = gte
+      f = F.gte
       check.("equal", f.(5,5), true)
     }
 
@@ -477,17 +477,17 @@ tests = [
   ["gte(4,5) is false",
 
     ->() { 
-      f = gte
+      f = F.gte
       check.("equal", f.(4,5), false)
     }
 
   ],
 
-  ["gte(infinity,500000) is true",
+  ["gte(F.infinity,500000) is true",
 
     ->() { 
-      f = gte
-      check.("equal", f.(infinity,500000), true)
+      f = F.gte
+      check.("equal", f.(F.infinity,500000), true)
     }
 
   ],
@@ -495,26 +495,26 @@ tests = [
   ["gte(500000,infinity) is false",
 
     ->() { 
-      f = gte
-      check.("equal", f.(500000, infinity), false)
+      f = F.gte
+      check.("equal", f.(500000, F.infinity), false)
     }
 
   ],
 
-  ["gte(negative_infinity,-500000) is false",
+  ["gte(F.negative_infinity,-500000) is false",
 
     ->() { 
-      f = gte
-      check.("equal", f.(negative_infinity,-500000), false)
+      f = F.gte
+      check.("equal", f.(F.negative_infinity,-500000), false)
     }
 
   ],
 
-  ["gte(-500000,negative_infinity) is true",
+  ["gte(-500000, F.negative_infinity) is true",
 
     ->() { 
-      f = gte
-      check.("equal", f.(-500000, negative_infinity), true)
+      f = F.gte
+      check.("equal", f.(-500000, F.negative_infinity), true)
     }
 
   ],
@@ -522,7 +522,7 @@ tests = [
   ["lt(5,2) is false",
 
     ->() { 
-      f = lt
+      f = F.lt
       check.("equal", f.(5,2), false)
     }
 
@@ -531,7 +531,7 @@ tests = [
   ["lt(5,5) is false",
 
     ->() { 
-      f = lt
+      f = F.lt
       check.("equal", f.(5,5), false)
     }
 
@@ -540,17 +540,17 @@ tests = [
   ["lt(4,5) is true",
 
     ->() { 
-      f = lt
+      f = F.lt
       check.("equal", f.(5,4), false)
     }
 
   ],
 
-  ["lt(infinity,500000) is false",
+  ["lt(F.infinity,500000) is false",
 
     ->() { 
-      f = lt
-      check.("equal", f.(infinity,500000), false)
+      f = F.lt
+      check.("equal", f.(F.infinity,500000), false)
     }
 
   ],
@@ -558,26 +558,26 @@ tests = [
   ["lt(500000,infinity) is true",
 
     ->() { 
-      f = lt
-      check.("equal", f.(500000, infinity), true)
+      f = F.lt
+      check.("equal", f.(500000, F.infinity), true)
     }
 
   ],
 
-  ["lt(negative_infinity,-500000) is true",
+  ["lt(F.negative_infinity,-500000) is true",
 
     ->() { 
-      f = lt
-      check.("equal", f.(negative_infinity,-500000), true)
+      f = F.lt
+      check.("equal", f.(F.negative_infinity,-500000), true)
     }
 
   ],
 
-  ["lte(-500000,negative_infinity) is false",
+  ["lte(-500000, F.negative_infinity) is false",
 
     ->() { 
-      f = lte
-      check.("equal", f.(-500000, negative_infinity), false)
+      f = F.lte
+      check.("equal", f.(-500000, F.negative_infinity), false)
     }
 
   ],
@@ -585,7 +585,7 @@ tests = [
   ["lte(5,2) is false",
 
     ->() { 
-      f = lte
+      f = F.lte
       check.("equal", f.(5,2), false)
     }
 
@@ -594,7 +594,7 @@ tests = [
   ["lte(5,5) is true",
 
     ->() { 
-      f = lte
+      f = F.lte
       check.("equal", f.(5,5), true)
     }
 
@@ -603,17 +603,17 @@ tests = [
   ["lte(4,5) is true",
 
     ->() { 
-      f = lte
+      f = F.lte
       check.("equal", f.(5,4), false)
     }
 
   ],
 
-  ["lte(infinity,500000) is false",
+  ["lte(F.infinity,500000) is false",
 
     ->() { 
-      f = lte
-      check.("equal", f.(infinity,500000), false)
+      f = F.lte
+      check.("equal", f.(F.infinity,500000), false)
     }
 
   ],
@@ -621,26 +621,26 @@ tests = [
   ["lte(500000,infinity) is true",
 
     ->() { 
-      f = lte
-      check.("equal", f.(500000, infinity), true)
+      f = F.lte
+      check.("equal", f.(500000, F.infinity), true)
     }
 
   ],
 
-  ["lte(negative_infinity,-500000) is true",
+  ["lte(F.negative_infinity,-500000) is true",
 
     ->() { 
-      f = lte
-      check.("equal", f.(negative_infinity,-500000), true)
+      f = F.lte
+      check.("equal", f.(F.negative_infinity,-500000), true)
     }
 
   ],
 
-  ["lte(-500000,negative_infinity) is false",
+  ["lte(-500000, F.negative_infinity) is false",
 
     ->() { 
-      f = lte
-      check.("equal", f.(-500000, negative_infinity), false)
+      f = F.lte
+      check.("equal", f.(-500000, F.negative_infinity), false)
     }
 
   ],
@@ -648,12 +648,20 @@ tests = [
 
   ## and equality marks our transition from numbers to other kinds of 'sequences' - === is eq, == is equals
 
+  ["equal(5,2) is false",
+
+    ->() { 
+      f = F.equal
+      check.("equals", f.(5,2), false)
+    }
+
+  ],
 
   ["equals(5,2) is false",
 
     ->() { 
-      f = equals
-      check.("equals", f.(5,2), false)
+      f = F.equals
+      check.("equal", f.(5,2), false)
     }
 
   ],
@@ -661,7 +669,7 @@ tests = [
   ["equals(5,5) is true",
 
     ->() { 
-      f = equals
+      f = F.equals
       check.("equal", f.(5,5), true)
     }
 
@@ -670,7 +678,7 @@ tests = [
   ["equals([[1],[2],[3]], [[1],[2],[3]]) is true for structurally deep objects",
 
     ->() { 
-      f = equals
+      f = F.equals
       check.("equal", f.([[1],[2],[3]], [[1],[2],[3]]), true)
     }
 
@@ -679,7 +687,7 @@ tests = [
   ["eq(5,2) is false",
 
     ->() { 
-      f = eq
+      f = F.eq
       check.("equal", f.(5,2), false)
     }
 
@@ -688,7 +696,7 @@ tests = [
   ["eq(5,5) is true",
 
     ->() { 
-      f = eq
+      f = F.eq
       check.("equal", f.(5,5), true)
     }
 
@@ -701,7 +709,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -710,7 +718,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -721,7 +729,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -730,7 +738,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -739,7 +747,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -748,7 +756,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -757,7 +765,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -766,7 +774,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -775,7 +783,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -784,7 +792,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -793,7 +801,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -802,7 +810,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -811,7 +819,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -820,7 +828,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -829,7 +837,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -838,7 +846,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -847,7 +855,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -856,7 +864,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -865,7 +873,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -874,7 +882,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -883,7 +891,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -892,7 +900,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -901,7 +909,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -910,7 +918,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -919,7 +927,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -928,7 +936,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -937,7 +945,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -946,7 +954,7 @@ tests = [
   ["sub_from(5,2) equals 3",
 
     ->() { 
-      f = sub_from
+      f = F.sub_from
       check.("equal", f.(5,2), 3)
     }
 
@@ -957,5 +965,4 @@ tests = [
 ]
 
 
-
-run_tests.(tests)
+DoubleCheck.new(tests).run
