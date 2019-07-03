@@ -4,18 +4,14 @@ class F
 	@@prerequisites = {
     infinity: Float::INFINITY,
     negative_infinity: -Float::INFINITY,
-  }
 
-  @@prerequisites.each_pair {|name, fn| self.define_singleton_method(name) { fn }};1
+    ## functions
+    id: Identity.new,
+    apply: ->(f, x) { f.(x) },
+  	flip: -> (f,x,y) { f.(y,x) },
+  	slf: -> (f, x) { f.(x,x) },
 
-
-  @@initials = {
-  ## functions
-  id: Identity.new,
-  flip: -> (f,x,y) { f.(y,x) },
-  slf: -> (f, x) { f.(x,x) },
-  
-  fix: ->(f, x) { 
+  	fix: ->(f, x) { 
     result = x
     next_result = f.(x)
     while result != next_result
@@ -23,7 +19,17 @@ class F
       next_result = f.(result)
     end
     result
-  },
+  	},
+
+  	# stream combinators
+  	to_stream: ToStream.new(),
+  	from_stream: FromStream.new(),
+  }
+
+  @@prerequisites.each_pair {|name, fn| self.define_singleton_method(name) { fn }};1
+
+
+  @@initials = {
 
   ## booleans
   nt: ->(x) { !x },
@@ -44,7 +50,6 @@ class F
   div_from: ->(x,y) { x / y },
   div_by: ->(y,x) { x / y},
   sub_by: ->(y,x) { x - y},
-
   
   equals: ->(x,y) { x== y },
   eq: ->(x,y) { x === y },
@@ -72,11 +77,109 @@ class F
   
   ## functional combinators - higher-order functions generic over their container
   
-  to_stream: ToStream.new(),
-  from_stream: FromStream.new(),
-  
-  foldl: ->(f,u,l) { l.foldl(f, u) }, ## ->(f, u) { Foldl.new([f,u]) }
-  foldr: ->(f,u,l) { l.foldr(f, u) },
+  foldl: ->(f,u) { 
+
+  	->(stream) {
+  		next_item = stream.next_item
+  		result = u
+  		while next_item != [:done]
+  			if next_item.first == :skip
+  				
+  			elsif next_item.first == :item
+  				result = f.(result, next_item[1])
+  			else
+  				raise "#{next_item} is a malformed stream response"
+  			end
+  			next_item = next_item.last.next_item
+  		end
+  		result	
+  	} * F.to_stream
+
+  }, ## ->(f, u) { Foldl.new([f,u]) }
+  foldr: ->(f,u) { 
+  	->(stream) {
+  		next_item = stream.next_item
+  		if next_item == [:done]
+  			u
+  		elsif next_item.first == :skip 
+  			F.foldr.(f, u, next_item.last)
+  		elsif next_item.first == :item
+  			f.(next_item[1], F.foldr.(f, u, next_item.last))
+  		else
+  			raise "#{next_item} is improperly formed for a Stream"
+  		end
+  	} * F.to_stream
+  		
+  },
+
+  map: ->(fn) { 
+  	F.from_stream * ->(stream) {
+  		Stream.new(->(old_stream) { 
+  			next_item = old_stream.next_item
+  			if next_item == [:done]
+  				[:done]
+  			elsif next_item.first == :skip 
+  				[:skip, next_item.last]
+  			elsif next_item.first == :item
+  				[next_item.first, fn.(next_item[1]), next_item.last]
+  			else
+  				raise "#{next_item} is improperly formed for a Stream result"
+  			end
+  		}, stream) 
+  	} * F.to_stream
+  },
+
+  filter: ->(fn) { 
+  	F.from_stream * ->(stream) {
+  		Stream.new(->(old_stream) { 
+  			next_item = stream.next_item
+  			if next_item == [:done]
+  				[:done]
+  			elsif next_item.first == :skip || (next_item.first == :item && !fn.(next_item[1]))
+  				[:skip, next_item.last.to_stream]
+  			elsif next_item.first == :item && fn.(next_item[1])
+  				[next_item.first, fn.(item[1]), next_item.last.to_stream]
+  			else
+  				raise "#{next_item} is not a valid stream state!"
+  			end
+  		}, stream) 
+  	} * F.to_stream
+  },
+
+  flatmap: ->(fn) { 
+  	F.from_stream * ->(stream) {
+  		Stream.new(->(old_stream) { 
+  			next_item = stream.next_item
+  			if next_item == [:done]
+  				[:done]
+  			elsif next_item.first == :skip
+  				[:skip, next_item.last]
+  			elsif next_item.first == :item
+  				[next_item.first, fn.(item[1]), next_item.last]
+  			else
+  				raise "#{next_item} is not a valid stream state!"
+  			end
+  		}, stream) 
+  	} * F.to_stream
+  },
+
+  wrap: ->(x) {
+  	Stream.new(->(bool) { bool ? [:item, x, false] : [:done]}, true)
+  },
+
+  range: ->(begin_with, end_with) {
+  	Stream.new(->(n) { n > h  ?  [:done]  :  [:item, n, n + 1] }, begin_with)
+  },
+
+  append: ->(xs, ys) {
+
+  },
+
+  zip: ->(xs, ys) {
+
+  },
+
+
   
   
   unfoldl: -> (next_fn, stop_fn, seed) { 
@@ -93,10 +196,10 @@ class F
 
   @@requiring_initials = {
   ## numbers
-
   double: slf.(plus),
   square: slf.(times),
   equal: equals,
+
 
   ## lists
 
@@ -107,9 +210,6 @@ class F
   reverse: foldl.(->(acc, el) { cons.(el, acc) }, []), ## or foldr.(->(el,acc) { snoc.(acc, el) }, [])
   
   length: foldl.(inc, 0),
-  map: ->(f) { foldl.(->(acc,el) { acc.push(f.(el)) }, [])},
-  filter: ->(f) { foldl.(->(acc,el) { f.(el) ? snoc.(acc,el) : acc }, []) },
-  
   
   all: ->(f) { foldl(->(acc, el) { f.(el) && acc }, true) },
   any: ->(f) { foldl(->(acc, el) { acc || f.(el) }, false) },
