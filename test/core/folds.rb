@@ -1,4 +1,5 @@
 tests = [
+=begin
   ["able to combine two, three, or more foldls in an associative manner to produce a single foldl that traverse the object only once",
 
     ->() { 
@@ -16,7 +17,7 @@ tests = [
     }
 
   ],
-=begin
+
   ["composing two maps creates a new map that traverses the object only once",
 
     ->() { 

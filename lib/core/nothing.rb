@@ -1,5 +1,5 @@
 require 'singleton'
 
-def Undef
+def Nothing
   include Singleton
 end

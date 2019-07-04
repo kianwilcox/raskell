@@ -96,6 +96,9 @@ class F
     } * F.to_stream
 
   }, ## ->(f, u) { Foldl.new([f,u]) }
+
+  ## implement this and foldl instead as first implementing scanl and scanr, and then choosing the very last value of the stream
+  ## so that we can have an abort-fold-when that gives the value collected so far like a loop that terminates early
   foldr: ->(f,u) { 
     ->(stream) {
       next_item = stream.next_item
@@ -113,22 +116,20 @@ class F
   },
 
   map: ->(fn) { 
-    F.from_stream * ->(stream) {
-      next_fn = ->(old_stream) {
-        next_el = old_stream.next_item
+    ->(stream) {
+      next_fn = ->(next_el) {
         if next_el == [:done]
           [:done]
-        elsif next_el.first == :skip 
+        elsif next_el.first == :skip
           [:skip, Stream.new(next_fn, next_el.last.state)]
         elsif next_el.first == :yield
-          [next_el.first, F.plus.(10).(next_el[1]), Stream.new(next_fn, next_el.last.state)]
+          [next_el.first, fn.(next_el[1]), Stream.new(next_fn, next_el.last.state)]
         else
-          raise "#{next_item} is improperly formed for a Stream result"
+          raise "#{next_el.inspect} is not a valid stream state!"
         end
-      }, 
-
-      Stream.new(next_fn, stream) 
-    }
+      } * stream.next_item_function
+      Stream.new(next_fn, stream.state) 
+    } * to_stream
   },
 
   filter: ->(fn) { 
@@ -145,25 +146,24 @@ class F
         end
       } * stream.next_item_function
       Stream.new(next_fn, stream.state) 
-    }
+    } * to_stream
   },
 
   flatmap: ->(fn) { 
-    F.from_stream * ->(stream) {
-      stream_next_fn = ->(old_stream) { 
-        next_item = old_stream.next_item
-        if next_item == [:done]
+    ->(stream) {
+      next_fn = ->(next_el) {
+        if next_el == [:done]
           [:done]
-        elsif next_item.first == :skip
-          [:skip, Stream.new(stream_next_fn, next_item.last.state)]
-        elsif next_item.first == :yield
-          [next_item.first, fn.(next_item[1]), Stream.new(stream_next_fn, next_item.last.state)]
+        elsif next_el.first == :skip || (next_el.first == :yield && !fn.(next_el[1]))
+          [:skip, Stream.new(next_fn, next_el.last.state)]
+        elsif next_el.first == :yield && fn.(next_el[1])
+          [next_el.first, next_el[1], Stream.new(next_fn, next_el.last.state)]
         else
-          raise "#{next_item.inspect} is not a valid stream state!"
+          raise "#{next_el.inspect} is not a valid stream state!"
         end
-      }
-      Stream.new(stream_next_fn, stream)
-    } * F.to_stream
+      } * stream.next_item_function
+      Stream.new(next_fn, stream.state) 
+    } * to_stream
   },
 
   wrap: ->(x) {
@@ -181,12 +181,60 @@ class F
     end)
   },
 
-  append: ->(xs, ys) {
+  append: ->(left_stream, right_stream) {
+      right_next_fn = ->(next_el) {
+        if next_el == [:done]
+          [:done]
+        elsif next_el.first == :skip
+          [:skip, Stream.new(right_next_fn, next_el.last.state)]
+        elsif next_el.first == :yield
+          [next_el.first, next_el[1], Stream.new(right_next_fn, next_el.last.state)]
+        else
+          raise "#{next_el.inspect} is not a valid stream state!"
+        end
+      } * right_stream.next_item_function
 
+      left_next_fn = ->(next_el) {
+        if next_el == [:done]
+          [:skip, Stream.new(right_next_fn, right_stream.state)]
+        elsif next_el.first == :skip
+          [:skip, Stream.new(left_next_fn, next_el.last.state)]
+        elsif next_el.first == :yield
+          [next_el.first, next_el[1], Stream.new(left_next_fn, next_el.last.state)]
+        else
+          raise "#{next_el.inspect} is not a valid stream state!"
+        end
+      } * left_stream.next_item_function
+      
+      Stream.new(left_next_fn, left_stream.state)
   },
 
-  zip: ->(xs, ys) {
+  zip: ->(left_stream, right_stream) {
+    right_next_fn = ->(next_el) {
+        if next_el == [:done]
+          [:done]
+        elsif next_el.first == :skip
+          [:skip, Stream.new(right_next_fn, next_el.last.state)]
+        elsif next_el.first == :yield
+          [next_el.first, next_el[1], Stream.new(right_next_fn, next_el.last.state)]
+        else
+          raise "#{next_el.inspect} is not a valid stream state!"
+        end
+      } * right_stream.next_item_function
 
+      left_next_fn = ->(next_el) {
+        if next_el == [:done]
+          [:skip, Stream.new(right_next_fn, right_stream.state)]
+        elsif next_el.first == :skip
+          [:skip, Stream.new(left_next_fn, next_el.last.state)]
+        elsif next_el.first == :yield
+          [next_el.first, next_el[1], Stream.new(left_next_fn, next_el.last.state)]
+        else
+          raise "#{next_el.inspect} is not a valid stream state!"
+        end
+      } * left_stream.next_item_function
+      
+      Stream.new(left_next_fn, left_stream.state)
   },
 
 
