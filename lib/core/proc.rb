@@ -26,7 +26,7 @@ class Proc
       result = self.standard_ruby_call(*args_to_consume)
     end
     # if the result is a proc, make sure to unwrap further by recursively calling with any remaining arguments
-    result.kind_of?(Proc) && remaining_args.length > 0 ? result.call(*remaining_args) : result
+    (result.kind_of?(Proc) && remaining_args.length > 0) || (result.kind_of?(Proc) && remaining_args.length == 0 && result.respond_to?(:arity) && result.arity == 0)? result.call(*remaining_args) : result
   end
   
   def *(lamb)

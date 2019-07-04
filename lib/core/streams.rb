@@ -1,8 +1,9 @@
 class Stream
+  attr_accessor :state
   def initialize(next_item, state)
     @next_item = next_item
     @state = state
-    ## step_fn should return one of [:done], [:item element stream], or [:skip stream]
+    ## step_fn should return one of [:done], [:yield element stream], or [:skip stream]
     self
   end
 
@@ -52,13 +53,17 @@ class Stream
     FromStream.new().(self)
   end
 
+  def to_a
+    from_stream
+  end
+
   def next_item
-    result = @next_item.(@state)
-    while result.first == :skip
-      result = result.last.next_item
-    end
     @next_item.(@state)
   end
+
+  def next_item_function
+    @next_item
+  end 
 
   def foldl(func, unit)
     from_stream.foldl(func, unit)
@@ -152,12 +157,12 @@ class ToStream
     end
   end
 
-  def <=(val)
+  def <<(val)
     # feed data from the right
     self.(val.())
   end
 
-  def >=(lamb)
+  def >>(lamb)
     # feed data from the left, assuming I am a wrapped Object of some sort
     lamb.(self)
   end
@@ -193,7 +198,7 @@ class FromStream
     stream = stream.to_stream
     next_val = stream.next_item
     while next_val.first != :done
-      result.push(next_val[1]) if next_val.first == :item
+      result.push(next_val[1]) if next_val.first == :yield
       next_val = next_val.last.next_item
     end
     result

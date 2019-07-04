@@ -60,9 +60,9 @@ tests = [
 
     ->() { 
       f = F.to_stream * F.from_stream
-      g = F.to_stream * (F.from_stream* F.to_stream) * F.from_stream
-      h = F.from_stream * (F.to_stream* F.from_stream) * F.to_stream
-      i = F.to_stream * (F.from_stream* F.to_stream) * F.from_stream
+      g = F.to_stream * (F.from_stream * F.to_stream) * F.from_stream
+      h = F.from_stream * (F.to_stream * F.from_stream) * F.to_stream
+      i = F.to_stream * (F.from_stream * F.to_stream) * F.from_stream
       ## should be fusing 7 times
       check.("equal", f.class, Identity)
       check.("equal", g.class, Identity)

@@ -73,7 +73,7 @@ class DoubleCheck
 	
 	@@failure_report = ->(test_number, failures) { (puts("#{failures}") || puts("#{failures.length} Failures out of #{test_number} Tests:") || F.map.(->(failure) { puts failure.first; failure.first }).(failures)) if failures.length > 0 }
 	
-	@@run_tests = ->(tests_to_run) { @@failure_report.(tests_to_run.length) * F.filter.(@@did_test_fail) * ->(tests) { puts "Running #{tests.length} Tests"; puts(SEPARATOR); tests} <= tests_to_run }
+	@@run_tests = ->(tests_to_run) { @@failure_report.(tests_to_run.length) * ->(l) { l.select {|x| @@did_test_fail.(x) } } * ->(tests) { puts "Running #{tests.length} Tests"; puts(SEPARATOR); tests} <= tests_to_run }
 
 	def initialize(tests)
 		@tests = tests

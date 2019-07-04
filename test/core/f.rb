@@ -1,33 +1,11 @@
 =begin The below is the surface
 
-flip = -> (f,x,y) { f.(y,x) }
-
-
-gt = ->(x,y) { x > y }
-lt = ->(x,y) { x < y }
-gte = ->(x,y) { x >= y }
-lte = ->(x,y) { x <= y }
-
-max = ->(x,y) { x >= y ? x : y}
-min = ->(x,y) { x <= y ? x : y}
-
 nd = ->(x,y) { x && y }
 nnd = ->(x,y) { !(x && y) }
 r = ->(x,y) { x || y }
 xr = ->(x,y) { !(x && y) && (x || y) }
 
 nt = ->(x) { !x }
-
-fix = ->(f, x) { 
-  result = x
-  next_result = f.(x)
-  while result != next_result
-    result = next_result
-    next_result = f.(result)
-  end
-  result
-}
-
 
 
 
@@ -42,7 +20,6 @@ snoc = ->(l, el) { l + [el] }
 uncons = ->(l) { [first.(l), rest.(l)] }
 unsnoc = ->(l) { [init.(l), last.(l)]}
 
-slf = F.-> (f, x) { f.(x,x) }
 foldl = ->(f, u) { Foldl.new([f,u]) }
 foldr = ->(f,u,l) { l.foldr(u) { |el, acc| f.(el, acc) } }
 
@@ -724,243 +701,195 @@ tests = [
 
   ],
 
+  ## core stream combinators
 
-=begin
-  ["sub_from(5,2) equals 3",
+  ["to_stream transforms an array of elements into a stream",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.to_stream
+      check.("equal", f.([1,2,3,4,5]), [1,2,3,4,5].to_stream)
+      check.("equal", f.([1,2,3,4,5]).class, Stream)
+      
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["from_stream transforms a stream of elements into an array",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.from_stream
+      check.("equal", f.([1,2,3,4,5].to_stream), [1,2,3,4,5])
+      check.("equal", f.([1,2,3,4,5].to_stream).class, Array)
+      
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["wrap takes a single element and wraps it into a single-element stream",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.wrap
+      check.("equal", f.(5), [5])
+      check.("equal", f.(5).class, Stream)
+      
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["map takes a function and a stream and returns a new stream that applies this function to every element in the old stream",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.map.(F.plus.(10))
+      check.("equal", f.([1,2,3,4].to_stream), [11,12,13,14])
+      check.("equal", f.([1,2,3,4].to_stream).class, Stream)
+      
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["filter takes a function and a stream, and returns a new stream that is the result of only keeping items from the original stream that match the function",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.filter.(F.lt.(3))
+      check.("equal", f.([1,2,3,4].to_stream), [1,2])
+      check.("equal", f.([1,2,3,4].to_stream).class, Stream)
+      
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["flatmap takes a function that produces a list, and a stream, and produces a new stream from concatenating the result of applying the function to every element",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.flatmap.(->(x) { [x,x,x] })
+      check.("equal", f.([1,2].to_stream), [1,1,1,2,2,2])
+      check.("equal", f.([1,2].to_stream).class, Stream)
+      
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["range takes a start and an end, and produces a stream of integers starting at start and ending with end",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.range.(3, 7)
+      g = F.range.(3, -1)
+      h = F.range.(-1, 3)
+      i = F.range.(-1, -4)
+      j = F.range.(1,1)
+      check.("equal", f.to_a, [3,4,5,6,7])
+      check.("equal", g.to_a, [3,2,1,0,-1]) 
+      check.("equal", h.to_a, [-1,0,1,2,3])
+      check.("equal", i.to_a, [-1,-2,-3,-4])
+      check.("equal", j.to_a, [1])
+      check.("equal", f.class, Stream)
+      check.("equal", g.class, Stream)
+      check.("equal", h.class, Stream)
+      check.("equal", i.class, Stream)
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["append should take two streams, and produce a stream that is the result of concatenating the two streams together",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.append
+      check.("equal", f.([1,2,3,4].to_stream, [5,6,7,8].to_stream), [1,2,3,4,5,6,7,8])
+      check.("equal", f.([1,2,3,4].to_stream, [5,6,7,8].to_stream).class, Stream)
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["zip should take two streams, and produce a stream that is a result of pairing the two streams together until the shorter is exhausted",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.zip
+      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream), [[1,5], [2,6], [3,7], [4,8]])
+      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream).class, Stream)
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["multizip should take n streams, and produce a stream that is a result of making a list of the n streams together until the shorter is exhausted",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.multizip
+      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream, [9,10,11,12].to_stream), [[1,5,9], [2,6,10], [3,7,11], [4,8,12]])
+      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream, [9,10,11,12].to_stream).class, Stream)
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["long_zip should take two streams, and produce a stream that is a result of pairing the two streams together",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.long_zip
+      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream), [[1,5], [2,6], [3,7], [4,8], [0, nil]])
+      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream).class, Stream)
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["long_multizip should take n streams, and produce a stream that is a result of making a list of the n streams together",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.long_multizip
+      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream, [9,10,11,12].to_stream), [[1,5,9], [2,6,10], [3,7,11], [4,8,12], [0, nil, nil]])
+      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream, [9,10,11,12].to_stream).class, Stream)
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["interleave should take two streams, and produce a stream that is a result of interleaving the two streams together",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.interleave
+      check.("equal", f.([1,2,3,4].to_stream, [5,6,7,8].to_stream), [1,5,2,6,3,7,4,8])
+      check.("equal", f.([1,2,3,4,0,5].to_stream, [5,6,7,8].to_stream), [1,5,2,6,3,7,4,8,0,5])
+      check.("equal", f.([1,2,3,4].to_stream, [5,6,7,8].to_stream).class, Stream)
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["interweave should take n streams, and produce a stream that is a result of interleaving the n streams together",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.interweave
+      check.("equal", f.([1,2,3,4,0,5].to_stream, [5,6,7,8].to_stream, [9,10,11,12,1].to_stream), [1, 5, 9, 2, 6, 10, 3, 7, 11, 4, 8, 12, 0, 1, 5])
+      check.("equal", f.([1,2,3,4,0,5].to_stream, [5,6,7,8].to_stream, [9,10,11,12,1].to_stream).class, Stream)
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+
+  
+  ["foldl works over streams" ,
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.foldl.(F.plus, 0)
+      g = F.foldl.(F.times, 1)
+      h = F.foldl.(->(acc, el) { acc + [el+10]}, [])
+      check.("equal", f.([1,2,3,4].to_stream), 10)
+      check.("equal", g.([1,2,3,4].to_stream), 24)
+      check.("equal", h.([1,2,3,4].to_stream), [11,12,13,14])
+      check.("equal", h.([1,2,3,4].to_stream).class, Array)
     }
 
   ],
 
-  ["sub_from(5,2) equals 3",
+  ["foldr works over streams",
 
     ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
+      f = F.foldr.(F.plus, 0)
+      g = F.foldr.(F.times, 1)
+      h = F.foldr.(->(el, acc) { [el+10] + acc}, [])
+      check.("equal", f.([1,2,3,4].to_stream), 10)
+      check.("equal", g.([1,2,3,4].to_stream), 24)
+      check.("equal", h.([1,2,3,4].to_stream), [11,12,13,14])
+      check.("equal", h.([1,2,3,4].to_stream).class, Array)
     }
 
-  ],
-
-  ["sub_from(5,2) equals 3",
-
-    ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
-    }
-
-  ],
-
-  ["sub_from(5,2) equals 3",
-
-    ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
-    }
-
-  ],
-
-  ["sub_from(5,2) equals 3",
-
-    ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
-    }
-
-  ],
-
-  ["sub_from(5,2) equals 3",
-
-    ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
-    }
-
-  ],
-
-  ["sub_from(5,2) equals 3",
-
-    ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
-    }
-
-  ],
-
-  ["sub_from(5,2) equals 3",
-
-    ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
-    }
-
-  ],
-
-  ["sub_from(5,2) equals 3",
-
-    ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
-    }
-
-  ],
-
-  ["sub_from(5,2) equals 3",
-
-    ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
-    }
-
-  ],
-
-  ["sub_from(5,2) equals 3",
-
-    ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
-    }
-
-  ],
-
-  ["sub_from(5,2) equals 3",
-
-    ->() { 
-      f = F.sub_from
-      check.("equal", f.(5,2), 3)
-    }
-
-  ],
-
-=end
+  ]
 
 ]
 

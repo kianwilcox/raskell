@@ -13,8 +13,8 @@ tests = [
   ["array.take(n) gets the first n items in an array",
 
     ->() { 
-      f = ->() { 1 }
-      check.("equal", f.(), 1)
+      f = [1,2,3,4,5]
+      check.("equal", f.take(3), [1,2,3])
     }
 
   ],
@@ -22,8 +22,9 @@ tests = [
   ["array.take(n) returns array if n >= array.length",
 
     ->() { 
-      f = ->() { ->() { 1 } }
-      check.("equal", f.(), 1)
+      f = [1,2,3,4,5]
+      check.("equal", f.take(5), [1,2,3,4,5])
+      check.("equal", f.take(10), [1,2,3,4,5])
     }
 
   ],
@@ -31,10 +32,8 @@ tests = [
   ["array.take(0) is []",
 
     ->() { 
-      f = ->(x,y) { x + y }
-      zero_applied = f.()
-      check.("equal", zero_applied.lambda?, true)
-      check.("equal", zero_applied.(1,2), 3)
+      f = [1,2,3,4,5]
+      check.("equal", f.take(0), [])
     }
 
   ],
@@ -42,8 +41,8 @@ tests = [
   ["array.drop(n) drops the first n items in an array",
 
     ->() { 
-      f = ->() { 1 }
-      check.("equal", f.(), 1)
+      f = [1,2,3,4,5]
+      check.("equal", f.drop(3), [4,5])
     }
 
   ],
@@ -51,31 +50,27 @@ tests = [
   ["array.drop(n) returns [] if n >= array.length",
 
     ->() { 
-      f = ->() { ->() { 1 } }
-      check.("equal", f.(), 1)
+      f = [1,2,3,4,5]
+      check.("equal", f.drop(5), [])
+      check.("equal", f.drop(10), [])
     }
 
   ],
 
-  ["[1,2,3].foldl(->(acc, el) { acc+[el+10] }, []) is [11, 12, 13]",
+  ["[1,2,3,4].foldl(->(acc, el) { acc+[el+10] }, []) is [11, 12, 13, 14]",
 
     ->() {
-      f = ->(a,b,c,d,e,f,g) { [a,b,c,d,e,f,g] }
-      check.("equal",[1,2,3].foldl(->(acc, el) { acc+[el+10] }, []),[11, 12, 13]) 
-      check.("equal",f.(1,2,3).(4).(5,6,7), [1,2,3,4,5,6,7]) 
-      check.("equal",f.(1).(2,3).(4,5,6).(7), [1,2,3,4,5,6,7]) 
-      check.("equal",f.(1).(2,3).(4,5).(6,7), [1,2,3,4,5,6,7])
-      check.("equal",f.(1).(2,3).().(4,5).(6,7), [1,2,3,4,5,6,7]) 
-      check.("equal",f.(1).(2,3).(4,5).(6,7).(), [1,2,3,4,5,6,7])
+      add10 = [1,2,3,4].foldl(->(acc, el) { acc+[el+10] }, [])
+      check.("equal",add10,[11, 12, 13, 14]) 
     }
 
   ],
 
-  ["[1,2,3].foldr(->(el, acc) { [el+10]+acc }, []) is [11, 12, 13]",
+  ["[1,2,3,4].foldr(->(el, acc) { [el+10]+acc }, []) is [11, 12, 13, 14]",
 
     ->() {
-      f = ->(a,b,c,d,e,f,g) { [a,b,c,d,e,f,g] }
-      check.("equal",[1,2,3].foldr(->(el, acc) { [el+10]+acc }, []), [11, 12, 13])
+      add10 = [1,2,3,4].foldr(->(el, acc) { [el+10]+acc }, [])
+      check.("equal", add10, [11, 12, 13, 14])
     }
 
   ],
@@ -110,19 +105,10 @@ tests = [
   ["[1,2,3] == [1,2,3].to_stream is true",
 
     ->() { 
-      f = ->(x) { x }
-      g = ->(x) { x + x }
-      h = ->(x) { x * x }
       
-      check.("equal", f.(3), 3)
-      check.("equal", g.(3), 6)
-      check.("equal", h.(3), 9)
-      check.("equal", [f,g].(3), [3,6])
-      check.("equal", (f + g).(3), [3,6])
-      check.("equal", [f,g,h].(3), [3,6,9])
-      check.("equal", ((f + g) + h).(3), [3,6,9])
-      check.("equal", (f + (g + h)).(3), [3,6,9])
-      check.("equal", ((f + g) + (h + h)).(3), [3,6,9,9])
+      check.("equal", [1,2,3].to_stream, [1,2,3].to_stream)
+      check.("equal", [1,2,3].to_stream, [1,2,3])
+      check.("equal", [1,2,3], [1,2,3].to_stream)
     }
 
   ],
@@ -130,19 +116,9 @@ tests = [
   ["[1,2,3] === [1,2,3].to_stream is ...", ## do we want this one to be true, === across each item pairwise, or false, because they aren't the same type?
 
     ->() { 
-      f = ->(x) { x }
-      g = ->(x) { x + x }
-      h = ->(x) { x * x }
-      
-      check.("equal", f.(3), 3)
-      check.("equal", g.(3), 6)
-      check.("equal", h.(3), 9)
-      check.("equal", [f,g].(3), [3,6])
-      check.("equal", (f + g).(3), [3,6])
-      check.("equal", [f,g,h].(3), [3,6,9])
-      check.("equal", ((f + g) + h).(3), [3,6,9])
-      check.("equal", (f + (g + h)).(3), [3,6,9])
-      check.("equal", ((f + g) + (h + h)).(3), [3,6,9,9])
+      check.("eq", [1,2,3].to_stream, [1,2,3].to_stream)
+      check.("eq", [1,2,3].to_stream, [1,2,3])
+      check.("eq", [1,2,3], [1,2,3].to_stream)
     }
 
   ],

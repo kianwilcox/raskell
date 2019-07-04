@@ -51,7 +51,7 @@ class Array
   end
 
   def self.next_item
-    ->(xs) { xs.empty? ? [:done] : [:item, xs.first, Array.to_stream(xs.drop(1))] }
+    ->(xs) { xs.empty? ? [:done] : [:yield, xs.first, Stream.new(self.next_item, xs.drop(1))] }
   end
 
   def self.to_stream(xs)

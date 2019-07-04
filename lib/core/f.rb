@@ -1,17 +1,17 @@
 require 'singleton'
 class F
-	include Singleton
-	@@prerequisites = {
+  include Singleton
+  @@prerequisites = {
     infinity: Float::INFINITY,
     negative_infinity: -Float::INFINITY,
 
     ## functions
     id: Identity.new,
     apply: ->(f, x) { f.(x) },
-  	flip: -> (f,x,y) { f.(y,x) },
-  	slf: -> (f, x) { f.(x,x) },
+    flip: -> (f,x,y) { f.(y,x) },
+    slf: -> (f, x) { f.(x,x) },
 
-  	fix: ->(f, x) { 
+    fix: ->(f, x) { 
     result = x
     next_result = f.(x)
     while result != next_result
@@ -19,11 +19,11 @@ class F
       next_result = f.(result)
     end
     result
-  	},
+    },
 
-  	# stream combinators
-  	to_stream: ToStream.new(),
-  	from_stream: FromStream.new(),
+    # stream combinators
+    to_stream: ToStream.new(),
+    from_stream: FromStream.new(),
   }
 
   @@prerequisites.each_pair {|name, fn| self.define_singleton_method(name) { fn }};1
@@ -79,96 +79,106 @@ class F
   
   foldl: ->(f,u) { 
 
-  	->(stream) {
-  		next_item = stream.next_item
-  		result = u
-  		while next_item != [:done]
-  			if next_item.first == :skip
-  				
-  			elsif next_item.first == :item
-  				result = f.(result, next_item[1])
-  			else
-  				raise "#{next_item} is a malformed stream response"
-  			end
-  			next_item = next_item.last.next_item
-  		end
-  		result	
-  	} * F.to_stream
+    ->(stream) {
+      next_item = stream.next_item
+      result = u
+      while next_item != [:done]
+        if next_item.first == :skip
+          
+        elsif next_item.first == :yield
+          result = f.(result, next_item[1])
+        else
+          raise "#{next_item} is a malformed stream response"
+        end
+        next_item = next_item.last.next_item
+      end
+      result  
+    } * F.to_stream
 
   }, ## ->(f, u) { Foldl.new([f,u]) }
   foldr: ->(f,u) { 
-  	->(stream) {
-  		next_item = stream.next_item
-  		if next_item == [:done]
-  			u
-  		elsif next_item.first == :skip 
-  			F.foldr.(f, u, next_item.last)
-  		elsif next_item.first == :item
-  			f.(next_item[1], F.foldr.(f, u, next_item.last))
-  		else
-  			raise "#{next_item} is improperly formed for a Stream"
-  		end
-  	} * F.to_stream
-  		
+    ->(stream) {
+      next_item = stream.next_item
+      if next_item == [:done]
+        u
+      elsif next_item.first == :skip 
+        F.foldr.(f, u, next_item.last)
+      elsif next_item.first == :yield
+        f.(next_item[1], F.foldr.(f, u, next_item.last))
+      else
+        raise "#{next_item} is improperly formed for a Stream"
+      end
+    } * F.to_stream
+      
   },
 
   map: ->(fn) { 
-  	F.from_stream * ->(stream) {
-  		Stream.new(->(old_stream) { 
-  			next_item = old_stream.next_item
-  			if next_item == [:done]
-  				[:done]
-  			elsif next_item.first == :skip 
-  				[:skip, next_item.last]
-  			elsif next_item.first == :item
-  				[next_item.first, fn.(next_item[1]), next_item.last]
-  			else
-  				raise "#{next_item} is improperly formed for a Stream result"
-  			end
-  		}, stream) 
-  	} * F.to_stream
+    F.from_stream * ->(stream) {
+      next_fn = ->(old_stream) {
+        next_el = old_stream.next_item
+        if next_el == [:done]
+          [:done]
+        elsif next_el.first == :skip 
+          [:skip, Stream.new(next_fn, next_el.last.state)]
+        elsif next_el.first == :yield
+          [next_el.first, F.plus.(10).(next_el[1]), Stream.new(next_fn, next_el.last.state)]
+        else
+          raise "#{next_item} is improperly formed for a Stream result"
+        end
+      }, 
+
+      Stream.new(next_fn, stream) 
+    }
   },
 
   filter: ->(fn) { 
-  	F.from_stream * ->(stream) {
-  		Stream.new(->(old_stream) { 
-  			next_item = stream.next_item
-  			if next_item == [:done]
-  				[:done]
-  			elsif next_item.first == :skip || (next_item.first == :item && !fn.(next_item[1]))
-  				[:skip, next_item.last.to_stream]
-  			elsif next_item.first == :item && fn.(next_item[1])
-  				[next_item.first, fn.(item[1]), next_item.last.to_stream]
-  			else
-  				raise "#{next_item} is not a valid stream state!"
-  			end
-  		}, stream) 
-  	} * F.to_stream
+    ->(stream) {
+      next_fn = ->(next_el) {
+        if next_el == [:done]
+          [:done]
+        elsif next_el.first == :skip || (next_el.first == :yield && !fn.(next_el[1]))
+          [:skip, Stream.new(next_fn, next_el.last.state)]
+        elsif next_el.first == :yield && fn.(next_el[1])
+          [next_el.first, next_el[1], Stream.new(next_fn, next_el.last.state)]
+        else
+          raise "#{next_el.inspect} is not a valid stream state!"
+        end
+      } * stream.next_item_function
+      Stream.new(next_fn, stream.state) 
+    }
   },
 
   flatmap: ->(fn) { 
-  	F.from_stream * ->(stream) {
-  		Stream.new(->(old_stream) { 
-  			next_item = stream.next_item
-  			if next_item == [:done]
-  				[:done]
-  			elsif next_item.first == :skip
-  				[:skip, next_item.last]
-  			elsif next_item.first == :item
-  				[next_item.first, fn.(item[1]), next_item.last]
-  			else
-  				raise "#{next_item} is not a valid stream state!"
-  			end
-  		}, stream) 
-  	} * F.to_stream
+    F.from_stream * ->(stream) {
+      stream_next_fn = ->(old_stream) { 
+        next_item = old_stream.next_item
+        if next_item == [:done]
+          [:done]
+        elsif next_item.first == :skip
+          [:skip, Stream.new(stream_next_fn, next_item.last.state)]
+        elsif next_item.first == :yield
+          [next_item.first, fn.(next_item[1]), Stream.new(stream_next_fn, next_item.last.state)]
+        else
+          raise "#{next_item.inspect} is not a valid stream state!"
+        end
+      }
+      Stream.new(stream_next_fn, stream)
+    } * F.to_stream
   },
 
   wrap: ->(x) {
-  	Stream.new(->(bool) { bool ? [:item, x, false] : [:done]}, true)
+    next_fn = ->(bool) { bool ? [:yield, x, Stream.new(next_fn, false)] : [:done]}
+    Stream.new(next_fn, true)
   },
 
   range: ->(begin_with, end_with) {
-  	Stream.new(->(n) { n > h  ?  [:done]  :  [:item, n, n + 1] }, begin_with)
+    (if begin_with <= end_with
+      stream_next_fn = ->(n) { n > end_with  ?  [:done]  :  [:yield, n, Stream.new(stream_next_fn, n + 1)] }
+      Stream.new(stream_next_fn, begin_with)
+    else
+      stream_next_fn = ->(n) { n < end_with  ?  [:done]  :  [:yield, n, Stream.new(stream_next_fn, n - 1)] }
+      Stream.new(stream_next_fn, begin_with)
+    end)
   },
 
   append: ->(xs, ys) {
@@ -182,12 +192,20 @@ class F
 
   
   
-  unfoldl: -> (next_fn, stop_fn, seed) { 
-    intermediate_result = seed
-    while !stop_fn.(intermediate_result)
-      intermediate_result = next_fn.(intermediate_result)
-    end
-    intermediate_result
+  unfoldl: -> (next_fn, seed) { 
+    stream_next_fn = ->(stream) {
+      result = stream.next_item
+      if result == [:done] || (result.first == :yield && stop_fn.(result[1]))
+        [:done]
+      elsif result.first == :skip
+        [:skip, Stream.new(stream_next_fn, result.last.state)]
+      elsif result.first == :yield
+        [:yield, result[1],  Stream.new(stream_next_fn, result.last.state)]
+      else
+        raise "#{result.inspect} is not of the correct stream result"
+      end
+    }
+    Stream.new(stream_next_fn, seed)
   },
 
 }
