@@ -8,8 +8,6 @@ class Proc
   # and self.arity is the number of arguments this Proc takes
 
   def call(*args)
-    args = args || []
-
     args_to_consume = args.take(self.arity)
     remaining_args = args.drop(self.arity)
     

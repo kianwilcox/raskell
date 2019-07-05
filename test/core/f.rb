@@ -741,8 +741,8 @@ tests = [
     ->() { 
       f = F.map.(->(x) { x * 10 })
       g = F.map.(F.times.(10))
-      check.("equal", f.([1,2,3,4].to_stream).to_a, [10,20,30,40])
-      check.("equal", g.([1,2,3,4].to_stream).to_a, [10,20,30,40])
+      check.("equal", f.([1,2,3,4].to_stream), [10,20,30,40])
+      check.("equal", g.([1,2,3,4].to_stream), [10,20,30,40])
       check.("equal", f.([1,2,3,4].to_stream).class, Stream)
       
     }
@@ -754,8 +754,8 @@ tests = [
     ->() { 
       f = F.filter.(->(x) { x > 2 })
       g = F.filter.(F.gt.(2))
-      check.("equal", f.([1,2,3,4].to_stream).to_a, [3,4])
-      check.("equal", f.([1,2,3,4].to_stream).to_a, [3,4])
+      check.("equal", f.([1,2,3,4].to_stream), [3,4])
+      check.("equal", f.([1,2,3,4].to_stream), [3,4])
       check.("equal", f.([1,2,3,4].to_stream).class, Stream)
       
     }
@@ -765,8 +765,8 @@ tests = [
   ["flatmap takes a function that produces a list, and a stream, and produces a new stream from concatenating the result of applying the function to every element",
 
     ->() { 
-      f = F.flatmap.(->(x) { [x,x,x] })
-      g = F.flatmap.(->(x) { [x+3] })
+      f = F.flatmap.(->(x) { [x,x,x].to_stream })
+      g = F.flatmap.(->(x) { [x+3].to_stream })
       h = F.flatmap.(F.wrap)
       i = F.flatmap.(F.wrap * F.times.(10))
       
@@ -790,11 +790,11 @@ tests = [
       h = F.range.(-1, 3)
       i = F.range.(-1, -4)
       j = F.range.(1,1)
-      check.("equal", f.to_a, [3,4,5,6,7])
-      check.("equal", g.to_a, [3,2,1,0,-1]) 
-      check.("equal", h.to_a, [-1,0,1,2,3])
-      check.("equal", i.to_a, [-1,-2,-3,-4])
-      check.("equal", j.to_a, [1])
+      check.("equal", f, [3,4,5,6,7])
+      check.("equal", g, [3,2,1,0,-1]) 
+      check.("equal", h, [-1,0,1,2,3])
+      check.("equal", i, [-1,-2,-3,-4])
+      check.("equal", j, [1])
       check.("equal", f.class, Stream)
       check.("equal", g.class, Stream)
       check.("equal", h.class, Stream)
@@ -807,12 +807,12 @@ tests = [
 
     ->() { 
       f = F.append
-      check.("equal", f.([1,2,3,4].to_stream, [5,6,7,8].to_stream).to_a, [1,2,3,4,5,6,7,8])
+      check.("equal", f.([1,2,3,4].to_stream, [5,6,7,8].to_stream), [1,2,3,4,5,6,7,8])
       check.("equal", f.([1,2,3,4].to_stream, [5,6,7,8].to_stream).class, Stream)
     }
 
   ],
-
+=begin
   ["zip should take two streams, and produce a stream that is a result of pairing the two streams together until the shorter is exhausted",
 
     ->() { 
@@ -873,7 +873,7 @@ tests = [
     }
 
   ],
-
+=end
 
   
   ["foldl works over streams" ,

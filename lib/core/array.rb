@@ -1,3 +1,5 @@
+
+
 class Array
 
   def fmap(fn)
@@ -51,7 +53,8 @@ class Array
   end
 
   def self.next_item
-    ->(xs) { xs.empty? ? [:done] : [:yield, xs.first, Stream.new(self.next_item, xs.drop(1))] }
+    next_fn = ->(xs) { xs == nil || (xs.respond_to?(:empty?) && xs.empty?) ? [:done] : [:yield, xs.first, Stream.new(next_fn, xs.drop(1))] }
+    next_fn
   end
 
   def self.to_stream(xs)
@@ -59,7 +62,7 @@ class Array
   end
 
   def to_stream
-    ToStream.new().(self)
+    self.class.to_stream(self)
   end
 
   alias_method :standard_equals, :==

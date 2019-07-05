@@ -11,11 +11,11 @@ class DoubleCheck
 		when op_name.kind_of?(Array)
 			op_name.last
 		when "not_equal"
-			->(x,y) { F.nt.(F.equals.(x,y))}
+			->(x,y) { F.not.(F.equals.(x,y))}
 		when "equal"
 			F.equals
 		when "not_eq"
-			->(x,y) { F.nt.(F.eq.(x,y))}
+			->(x,y) { F.not.(F.eq.(x,y))}
 		when "eq"
 			F.eq
 		when "gte"

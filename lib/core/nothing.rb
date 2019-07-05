@@ -1,5 +1,5 @@
 require 'singleton'
 
-def Nothing
+class Nothing
   include Singleton
 end

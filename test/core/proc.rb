@@ -48,6 +48,23 @@ tests = [
 
   ],
 
+  ["partially applied functions can be used more than once",
+
+    ->() { 
+      f = ->(a,b) { [a,b] }
+      g = f.(1)
+      check.("equal", f.lambda?, true)
+      check.("equal", g.lambda?, true)
+      check.("equal", g.(2), [1,2])
+      check.("equal", f.(1).lambda?, true)
+      check.("equal", f.(2,3), [2,3])
+      check.("equal", g.(3), [1,3])
+      
+      
+    }
+
+  ],
+
   # check composition
 
   ["function composition, *, is associative",
