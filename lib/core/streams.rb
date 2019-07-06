@@ -71,15 +71,12 @@ class Stream
 
   def *(to_stream)
     if to_stream.kind_of?(Stream)
-      ::F.interleave(self, to_stream)
-    elsif [FromStream, ToStream].include?(to_stream.class)
-      if !to_stream.before_function && !to_stream.after_function
-        self
-      else
-        raise "I should probably implement fusion when composing a stream with #{to_stream.class} that has a before or after"
-      end
+      next_fn = ->(state) {
+
+      }
+      Stream.new(next_fn, [self, to_stream])
     else
-      raise "Cannot compose a stream with a #{to_stream.class}"
+      raise "Cannot interleave a stream with a #{to_stream.class}"
     end
   end
 
@@ -110,6 +107,7 @@ class FromStream
     after ? after.(result) : result
   end
 
+
   def unfold(stream)
     result = []
     #puts 'unfolding'
@@ -124,21 +122,16 @@ class FromStream
   end
 
   def join(converter)
-    if converter.class == self.class
+    if converter.class == self.class && !converter.before_function && !self.after_function
       self.class.new({
         'before' => self.before_function,
         'after' => converter.after_function
       })
-    elsif !converter.after_function && !self.before_function
+    elsif [ToStream, StreamTransducer].include?(converter.class) && !converter.before_function && !self.after_function
       puts "Fused"
-      Identity.new
+      (converter.after_function || Identity.new) * (self.before_function || Identity.new)
     else
-      puts "Fused"
-      ->(xs) { 
-        xs = self.before_function.(xs) if self.before_function
-        xs = converter.after_function.(xs) if converter.after_function
-        xs
-      }
+      ->(xs) { converter.(self.(xs)) }
     end
   end
 
@@ -146,7 +139,7 @@ class FromStream
     if (before_converter.class == after_converter.class) || (before_converter.after_function == nil && after_converter.before_function == nil)
       before_converter.join(after_converter)
     else
-      ->(xs) { after_converter.(self.(before_converter.(xs))) }
+      ->(xs) { after_converter.(before_converter.(xs)) }
     end
 
   end
@@ -214,22 +207,20 @@ class ToStream
     after ? after.(result) : result
   end
 
-  def join(converter)
-    if converter.class == self.class
-      self.class.new({
-        'before' => self.before_function,
-        'after' => converter.after_function
+  def join(from)
+    to = self
+    if from.class == to.class && !from.before_function && !to.after_function
+      to.class.new({
+        'before' => to.before_function,
+        'after' => from.after_function
       })
-    elsif !converter.after_function && !self.before_function
-      puts "Fused"
-      Identity.new
+    elsif [FromStream, StreamTransducer].include?(from.class) && !from.before_function && !to.after_function
+      StreamTransducer.new({
+        'before' =>  to.before_function,
+        'after' => from.after_function
+      })
     else
-      puts "Fused"
-      ->(xs) { 
-        xs = self.before_function.(xs) if self.before_function
-        xs = converter.after_function.(xs) if converter.after_function
-        xs
-      }
+      ->(xs) { from.(to.(xs)) }
     end
   end
 
@@ -237,7 +228,7 @@ class ToStream
     if (before_converter.class == after_converter.class) || (before_converter.after_function == nil && after_converter.before_function == nil)
       before_converter.join(after_converter)
     else
-      ->(xs) { after_converter.(self.(before_converter.(xs))) }
+      ->(xs) { after_converter.(before_converter.(xs)) }
     end
 
   end
@@ -277,4 +268,44 @@ class ToStream
     # feed data from the left, assuming I am a wrapped Object of some sort
     lamb.(self.())
   end
+end
+
+class StreamTransducer
+
+  attr_accessor :before_function, :after_function
+  def initialize(options={})
+    @before_function = options['before']
+    @after_function = options['after']
+    @before_function && @after_function ? ->(x) { self.(x) } : self
+  end
+
+
+  alias_method :standard_kind_of?, :kind_of?
+  def kind_of?(clazz)
+    clazz == Proc || standard_kind_of?(clazz)
+  end
+
+
+  def call(stream)
+    before = @before_function
+    after = @after_function
+    stream = before.(stream) if before
+    result = self.unfold(stream)
+    after ? after.(result) : result
+  end
+
+
+  def unfold(stream)
+    result = []
+    #puts 'unfolding'
+    #puts stream.inspect
+    next_val = stream.next_item
+    while next_val.first != :done
+      #puts next_val.inspect
+      result.push(next_val[1]) if next_val.first == :yield
+      next_val = next_val.last.next_item
+    end
+    result
+  end
+
 end

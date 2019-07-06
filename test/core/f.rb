@@ -741,8 +741,8 @@ tests = [
     ->() { 
       f = F.map.(->(x) { x * 10 })
       g = F.map.(F.times.(10))
-      check.("equal", f.([1,2,3,4].to_stream), [10,20,30,40])
-      check.("equal", g.([1,2,3,4].to_stream), [10,20,30,40])
+      check.("equal", f.([1,2,3,4].to_stream).to_a, [10,20,30,40])
+      check.("equal", g.([1,2,3,4].to_stream).to_a, [10,20,30,40])
       check.("equal", f.([1,2,3,4].to_stream).class, Stream)
       
     }
@@ -753,9 +753,9 @@ tests = [
 
     ->() { 
       f = F.filter.(->(x) { x > 2 })
-      g = F.filter.(F.gt.(2))
-      check.("equal", f.([1,2,3,4].to_stream), [3,4])
-      check.("equal", f.([1,2,3,4].to_stream), [3,4])
+      g = F.filter.(F.flip.(F.gt.(2)))
+      check.("equal", f.([1,2,3,4].to_stream).to_a, [3,4])
+      check.("equal", g.([1,2,3,4].to_stream).to_a, [3,4])
       check.("equal", f.([1,2,3,4].to_stream).class, Stream)
       
     }
@@ -807,22 +807,33 @@ tests = [
 
     ->() { 
       f = F.append
-      check.("equal", f.([1,2,3,4].to_stream, [5,6,7,8].to_stream), [1,2,3,4,5,6,7,8])
-      check.("equal", f.([1,2,3,4].to_stream, [5,6,7,8].to_stream).class, Stream)
+      check.("equal", F.from_stream <= f.([1,2,3,4].to_stream).([5,6,7,8].to_stream), [1,2,3,4,5,6,7,8])
+      check.("equal", f.([1,2,3,4].to_stream).([5,6,7,8].to_stream).class, Stream)
     }
 
   ],
-=begin
+
+  ["scanl should produce a stream of intermediate foldl results",
+
+    ->() { 
+      f = F.scanl.(F.plus, 0)
+      check.("equal", F.from_stream <= f.([1,2,3,4].to_stream), [1,3,6,10])
+      check.("equal", f.([1,2,3,4].to_stream), Stream)
+    }
+
+  ],
+
   ["zip should take two streams, and produce a stream that is a result of pairing the two streams together until the shorter is exhausted",
 
     ->() { 
       f = F.zip
-      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream), [[1,5], [2,6], [3,7], [4,8]])
+      check.("equal", f.([1,2,3,4,0].to_stream).([5,6,7,8].to_stream).to_a, [[1,5], [2,6], [3,7], [4,8]])
       check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream).class, Stream)
     }
 
   ],
 
+=begin
   ["multizip should take n streams, and produce a stream that is a result of making a list of the n streams together until the shorter is exhausted",
 
     ->() { 

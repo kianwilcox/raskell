@@ -13,6 +13,8 @@ class DoubleCheck
 		when "not_equal"
 			->(x,y) { F.not.(F.equals.(x,y))}
 		when "equal"
+			F.equal
+		when "equals"
 			F.equals
 		when "not_eq"
 			->(x,y) { F.not.(F.eq.(x,y))}
@@ -26,6 +28,8 @@ class DoubleCheck
 			F.lte
 		when "lt"
 			F.lt
+		else
+			raise "#{op_name} is not supported by double_check. Please add this to the @@op_lookup function if you wish it to be supported"
 		end
 	}
 	

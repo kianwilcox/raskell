@@ -7,6 +7,10 @@ class Proc
   # .() is shorthand for .call() 
   # and self.arity is the number of arguments this Proc takes
 
+  def [](*args)
+    call(*args)
+  end
+
   def call(*args)
     args_to_consume = args.take(self.arity)
     remaining_args = args.drop(self.arity)
@@ -18,13 +22,13 @@ class Proc
       return self
     elsif args_to_consume.length < self.arity
       #if you have too few arguments, return a lambda asking for more before attempting to re-apply
-      return ->(x) { call( *( args.push(x) ) ) }
+      return ->(x) { self.call( *( args + [x] ) ) }
     else
       #otherwise, apply the arguments
       result = self.standard_ruby_call(*args_to_consume)
     end
     # if the result is a proc, make sure to unwrap further by recursively calling with any remaining arguments
-    (result.kind_of?(Proc) && remaining_args.length > 0) || (result.kind_of?(Proc) && remaining_args.length == 0 && result.respond_to?(:arity) && result.arity == 0)? result.call(*remaining_args) : result
+    (result.kind_of?(Proc) && remaining_args.length > 0) || (result.kind_of?(Proc) && remaining_args.length == 0 && result.respond_to?(:arity) && result.arity == 0) ? result.call(*remaining_args) : result
   end
   
   def *(lamb)
