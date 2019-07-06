@@ -80,6 +80,24 @@ class Stream
     end
   end
 
+  def call(*args)
+    next_fn = ->(next_item) {
+      tag = next_item.first
+      fn = next_item[1]
+      stream = next_item.last
+      if tag == :done
+        [:done]
+      elsif tag == :skip
+        [:skip, Stream.new(next_fn, stream.state)]
+      elsif tag == :yield
+        [:yield, fn.(*args), Stream.new(next_fn, stream.state)]
+      else
+        raise "#{next_item} is a malformed stream result!"
+      end
+    } * self.next_item_function
+    Stream.new(next_fn, self.state)
+  end
+
 end
 
 
@@ -306,6 +324,16 @@ class StreamTransducer
       next_val = next_val.last.next_item
     end
     result
+  end
+
+  def <=(val)
+    # feed data from the right
+    self.(val.())
+  end
+
+  def >=(lamb)
+    # feed data from the left, assuming I am a wrapped Object of some sort
+    lamb.(self.())
   end
 
 end

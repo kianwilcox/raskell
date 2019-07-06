@@ -352,6 +352,16 @@ class F
     replace: ->(to_replace, to_replace_with) {map.(->(x) { x == to_replace ? to_replace_with : x })},
     replace_with: ->(to_replace_with, to_replace) { map.(->(x) { x == to_replace ? to_replace_with : x }) },
     replace_by_if: ->(replace_fn, should_replace_fn) { map.( ->(x) { should_replace_fn.(x) ? replace_fn.(x) : x } ) },
+    take: ->(n) {
+
+    },
+    drop: ->(n) {
+
+    },
+    drop_except: ->(n) {
+
+    },
+
   
     # stream folds useful for containers of booleans
     ands: foldl.(self.and, true),
@@ -383,6 +393,16 @@ end
 
 =begin
 ## functionals useful for lists ( but which work on anything supporting .each, and will yield a list )
+
+
+
+maximum_by
+minimum_by
+
+intercalate = #->(el) { init.(foldl.(, []))}
+intersperse = 
+
+
 take
 drop
 take_while
@@ -390,15 +410,7 @@ drop_while
 take_until
 drop_until
 drop_except/last_n
-
-concat = foldl.(plus, [])
 enconcat = ->(l, el, r) { l + [el] + r }
-
-maximum_by
-minimum_by
-
-intercalate = #->(el) { init.(foldl.(, []))}
-intersperse = 
 
 intersection
 union

@@ -35,6 +35,16 @@ tests = [
 
   ],
 
+  ["streams also act as functions - calling a stream with arguments is equivalent to a new stream where each value is the result of calling the element with those arguments",
+
+    ->() { 
+      s = [F.plus, F.times.(10), 3].to_stream
+      check.("equal", s.(1,5), [6,10,3])
+      check.("equal", s.(1,5).class, Stream)
+    }
+
+  ],
+
   ["applying the Identity.new function to anything returns anything",
 
     ->() { 
@@ -56,7 +66,7 @@ tests = [
 
   ],
 
-  ["able to fuse away two streams into an Identity.new function",
+  ["able to fuse away two from_stream and to_stream in any order into an Identity.new function",
 
     ->() { 
       f = F.to_stream * F.from_stream
@@ -133,6 +143,52 @@ tests = [
     }
 
   ],
+
+  ["composing a FromStream with a normal lambda with a ToStream returns a StreamTransducer",
+
+    ->() { 
+      f = F.from_stream * F.map.(F.times.(10)) * F.to_stream
+      check.("equal", f.([1,2,3]), [10,20,30])
+      check.("equal", f.class, StreamTransducer)
+    }
+
+  ],
+
+  ["piping a ToStream with a stream function with a FromStream returns a StreamTransducer",
+
+    ->() { 
+      f = F.to_stream | F.map.(F.times.(10)) | F.from_stream
+      check.("equal", f.([1,2,3]), [10,20,30])
+      check.("equal", f.class, StreamTransducer)
+    }
+
+  ],
+
+  ["composing two StreamTransducers fuses away intermediate data structures",
+
+    ->() { 
+      f = F.from_stream * F.map.(F.times.(10)) * F.to_stream
+      g = F.from_stream * F.map.(F.plus.(10)) * F.to_stream
+      check.("equal", (f*g).([1,2,3]), [110,120,130])
+      check.("equal", (f*g).class, StreamTransducer)
+    }
+
+  ],
+
+  ["piping two StreamTransducers fuses away intermediate data structures",
+
+    ->() { 
+      f = F.to_stream | F.map.(F.times.(10)) | F.from_stream
+      g = F.to_stream | F.map(F.plus.(10)) | F.from_stream
+      check.("equal", (g|f).([1,2,3]), [110,120,130])
+      check.("equal", (g|f).class, StreamTransducer)
+    }
+
+  ],
+
+
+
+
 
   ["composing an arbitrary number of lambdas on only one side of a ToStream doesn't stop it from being fusable with a FromStream on the other",
 

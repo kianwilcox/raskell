@@ -802,7 +802,7 @@ tests = [
     }
 
   ],
-
+=begin TODO LATER
   ["append should take two streams, and produce a stream that is the result of concatenating the two streams together",
 
     ->() { 
@@ -812,7 +812,7 @@ tests = [
     }
 
   ],
-
+=end
   ["scanl should produce a stream of intermediate foldl results",
 
     ->() { 
