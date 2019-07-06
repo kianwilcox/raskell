@@ -2,22 +2,32 @@ require 'singleton'
 
 class F
   # stream combinators
-  def self.to_stream
-    ToStream.new()
+  def self.to_stream(*args)
+    if args.length > 0
+      ToStream.new().(*args)
+    else
+      ToStream.new()
+    end
   end
   
-  def self.from_stream
-    FromStream.new()
+  def self.from_stream(*args)
+    if args.length > 0
+      FromStream.new().(*args)
+    else
+      FromStream.new()
+    end
   end
 
   include Singleton
-  @@stage_1_defs = {
+
+  @@stage_0_defs = {
     infinity: Float::INFINITY,
     negative_infinity: -Float::INFINITY, 
     inf: Float::INFINITY,
     ninf: -Float::INFINITY,
     id: Identity.new,
     apply: ->(f, x) { f.(x) },
+    apply_with: ->(x,f) { f.(x) },
     flip: -> (f,x,y) { f.(y,x) },
     slf: -> (f, x) { f.(x,x) },
     fix: ->(f, x) { 
@@ -28,6 +38,25 @@ class F
         next_result = f.(result)
       end
       result
+    },
+
+    step: ->(step_fn, stop_fn) { ## if next_fn returns nothing, skip
+      next_fn = ->(next_item) {
+        tag = next_item.first
+        val = next_item[1]
+        next_stream = next_item.last
+        next_val = next_fn.(val) if tag == :yield
+        if tag == :done || (tag == :yield && stop_fn.(val))
+          [:done]
+        elsif tag == :skip || next_val == Nothing
+          [:skip, Stream.new(next_fn, next_stream)]
+        elsif tag == :yield
+          [:yield, next_val, Stream.new(next_fn, next_stream)]
+        else
+          raise "#{next_item.inspect} is a malformed stream response!\nExpected one of [:done], [:skip, stream], [:yield, item, stream]"
+        end
+      }
+      next_fn
     },
 
     ## booleans
@@ -57,14 +86,216 @@ class F
     #insert  ln, lg, log, log_base, e, pi, exp/pow, square, cube, nth_root, sqrt  here later
     max: ->(x,y) { x >= y ? x : y},
     min: ->(x,y) { x <= y ? x : y},
+
+    ## streams
     empty: Stream.new(->(x) { [:done] }, Nothing),
     wrap: ->(x) {
       next_fn = ->(bool) { bool ? [:yield, x, Stream.new(next_fn, false)] : [:done]}
       Stream.new(next_fn, true)
     },
     cons: ->(el) { 
-      ->(stream) {
+      from_stream * ->(stream) {
         Stream.new(->(x) { [:yield, el, stream] } , Nothing) 
+      } * to_stream
+    },
+
+    ## lists
+    list: ->(*items) {
+      items
+    }
+  }
+
+  @@stage_0_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
+
+
+  @@stage_0_5_defs={
+    unfoldl: -> (next_fn, stop_fn, seed) { 
+      stream_next_fn = step.(next_fn, stop_fn)
+      Stream.new(stream_next_fn, seed)
+    },
+    transducer: ->(next_val_fn, next_state_fn, stop_fn) {
+      from_stream * ->(stream) {
+        next_fn = ->(state) {
+          if stop_fn.(state)
+            [:done]
+          elsif (next_val = next_val_fn.(state)) == Nothing
+            [:skip, next_state_fn.(state)]
+          else
+            [:yield,  next_val_fn.(state), next_state_fn.(state)]
+          end
+        }
+        Stream.new(next_fn, stream)
+      } * to_stream
+    },
+  }
+  @@stage_0_5_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
+
+  @@stage_1_defs = {
+
+    ## stream functions
+
+    take: ->(n) {
+      raise("#{n} must be a positive number") if n < 0
+      from_stream * ->(stream) {
+        next_fn = ->(state) {
+          countdown = state.first
+          strm = state.last
+          if countdown == 0
+            [:done]
+          else
+            next_item = strm.next_item
+            tag = next_item.first
+            val = next_item[1]
+            next_strm = next_item.last
+            if tag == :done
+              [:done]
+            elsif tag == :skip
+              [:skip, [countdown, next_strm]]
+            elsif tag == :yield
+              [:yield, val, [countdown-1, ]]
+            else
+              raise "#{next_item} is a malformed stream response!"
+            end
+          end
+        }
+        Stream.new(next_fn, [n, stream])
+      } * to_stream
+    }, 
+    drop: ->(n) {
+      raise("#{n} must be a positive number") if n < 0
+      from_stream * ->(stream) {
+        next_fn = ->(state) {
+          countdown = state.first
+          strm = state.last
+          if countdown == 0
+            [:skip, strm]
+          else
+            next_item = strm.next_item
+            tag = next_item.first
+            val = next_item[1]
+            next_strm = next_item.last
+            if tag == :done
+              [:done]
+            elsif tag == :skip
+              [:skip, [countdown, next_strm]]
+            elsif tag == :yield
+              [:skip, [countdown-1, next_strm]]
+            else
+              raise "#{next_item} is a malformed stream response!"
+            end
+          end
+        }
+        Stream.new(next_fn, [n, stream])
+      } * to_stream
+    }, 
+    drop_except: ->(n) {
+      raise("#{n} must be a positive number") if n < 0
+      from_stream * ->(stream) {
+        next_fn = ->(strm) { 
+          potential_stream = take.(n+1) <= strm
+          if (length.(potential_stream)) < n+1
+            [:skip, take.(n) <= strm]
+          else
+            next_item = strm.next_item
+            tag = next_item.first
+            val = next_item[1]
+            next_strm = next_item.last
+            if tag == :done
+              [:done]
+            elsif tag == :skip
+              [:skip, [countdown, next_strm]]
+            elsif tag == :yield
+              [:skip, [countdown-1, next_strm]]
+            else
+              raise "#{next_item} is a malformed stream response!"
+            end
+          end
+        }
+        Stream.new(next_fn, stream)
+      } * to_stream
+    },
+
+    take_while: ->(fn) {
+      raise("take_while requires a function") unless fn.kind_of?(Proc)
+      from_stream * ->(stream) {
+        next_fn = ->(state) {
+            tag = next_item.first
+            val = next_item[1]
+            next_stream = next_item.last
+            if tag == :done || (tag == :yield && !fn.(val))
+              [:done]
+            elsif tag == :skip
+              [:skip, Stream.new(next_fn, next_stream)]
+            elsif tag == :yield
+              [:yield, val, Stream.new(next_fn, next_stream)]
+            else
+              raise("#{next_item} is a malformed stream response!")
+            end
+        } * stream.next_item_function
+        Stream.new(next_fn, [n, stream])
+      } * to_stream
+    }, 
+
+    drop_while: ->(fn) {
+      raise("drop_while requires a function") unless fn.kind_of?(Proc)
+      from_stream * ->(stream) {
+        next_fn = ->(next_item) {
+            tag = next_item.first
+            val = next_item[1]
+            next_strm = next_item.last
+            if tag == :done
+              [:done]
+            elsif tag == :skip || (tag == :yield && fn.(val))
+              [:skip, Stream.new(next_fn, next_strm)]
+            elsif tag == :yield
+              [:skip, next_strm]
+            else
+              raise("#{next_item} is a malformed stream response!")
+            end
+        } * stream.next_item_function
+        Stream.new(next_fn, [n, stream])
+      } * to_stream
+    }, 
+
+    take_until: ->(fn) {
+      raise("take_until requires a function") unless fn.kind_of?(Proc)
+      from_stream * ->(stream) {
+        next_fn = ->(state) {
+            tag = next_item.first
+            val = next_item[1]
+            next_strm = next_item.last
+            if tag == :done || (tag == :yield && fn.(val))
+              [:done]
+            elsif tag == :skip
+              [:skip, Stream.new(next_fn, next_strm)]
+            elsif tag == :yield
+              [:yield, val, Stream.new(next_fn, next_strm)]
+            else
+              raise "#{next_item} is a malformed stream response!"
+            end
+        } * stream.next_item_function
+        Stream.new(next_fn, [n, stream])
+      } * to_stream
+    }, 
+
+    drop_until: ->(fn) {
+      raise("drop_until requires a function") unless fn.kind_of?(Proc)
+      from_stream * ->(stream) {
+        next_fn = ->(next_item) {
+            tag = next_item.first
+            val = next_item[1]
+            next_strm = next_item.last
+            if tag == :done
+              [:done]
+            elsif tag == :skip || (tag == :yield && !fn.(val))
+              [:skip, Stream.new(next_fn, next_strm)]
+            elsif tag == :yield
+              [:skip, next_strm]
+            else
+              raise "#{next_item} is a malformed stream response!"
+            end
+        } * stream.next_item_function
+        Stream.new(next_fn, [n, stream])
       } * to_stream
     },
     first: -> (stream) { ## should offer an equivalent that returns a stream with a single element
@@ -72,21 +303,18 @@ class F
       while next_item.first == :skip
         next_item = next_item.last.next_item
       end
-      next_item.first == :yield ? next_item[1] : raise("first requires the stream to have at least one item")
-    } * to_stream,
-    last: ## should offer an equivalent that returns a stream with a single element
-     -> (stream) { 
-      next_fn = {
-
-      }
-      Stream.new(next_fn, stream)
+      next_item.first == :yield ? next_item[1] : Nothing
     } * to_stream,
     rest: -> (stream) { 
-      stream.next_item.last
+      next_item = stream.next_item.last
+      next_item == [:done] ? Nothing : next_item.last
     } * to_stream,
-    init: ->(stream) {
-      next_fn = ->(s) {
-        next_item = s.next_item
+    init: ->(stream) { 
+                       #### call it a step-transformer, or step-transducer, or just a step function or stepper
+                       #### write a function that produces a function that processes a single next item
+                       #### it should take a function for what to do when it's done, when it's skip, and when it's yield
+                       #### and those functions should yield 'step's in a stream
+      next_fn = ->(next_item) {
         if next_item == [:done]
           raise "init requires a stream length of at least 1"
         elsif next_item.first == :skip 
@@ -98,7 +326,7 @@ class F
         else
           raise "#{next_item} is a malformed stream response"
         end
-      }
+      } * s.next_item_function
       Stream.new(next_fn, stream)
     } * to_stream,
     snoc: ->(el) {
@@ -157,31 +385,23 @@ class F
       } * to_stream
         
     },
+
     scanl: ->(f,u) { 
-      ->(stream) {
+      from_stream * ->(stream) {
         next_fn = ->(state) {
-          puts "state is"
-          puts state.inspect
           result_so_far = state.first
           strm = state.last
           next_item = strm.next_item
           tag = next_item[0]
           val = next_item[1]
           next_stream = next_item.last
-          puts tag.inspect
-          puts val.inspect
-          puts next_stream.inspect
-          puts result_so_far.inspect
           if tag == :done
-            puts "done"
             [:done]
           elsif tag == :skip
-            [:skip, [result_so_far, next_stream]]
+            [:skip, Stream.new(next_fn, [result_so_far, next_stream])]
           elsif tag == :yield
             new_result = f.(result_so_far, val)
-            puts 'new result is'
-            puts new_result.inspect
-            [:yield, new_result, [new_result, next_stream] ]
+            [:yield, new_result, Stream.new(next_fn, [new_result, next_stream]) ]
           else
             raise "#{next_item} is a malformed stream response"
           end
@@ -191,40 +411,42 @@ class F
     
     },
     map: ->(fn) { 
-         ->(stream) {
-          next_fn = ->(next_el) {
+        from_stream * ->(stream) {
+          next_fn = ->(state) {
+            next_el = state.next_item
             if next_el == [:done]
               [:done]
             elsif next_el.first == :skip
-              [:skip, Stream.new(next_fn, next_el.last.state)]
+              [:skip, Stream.new(next_fn, next_el.last)]
             elsif next_el.first == :yield
-              [next_el.first, fn.(next_el[1]), Stream.new(next_fn, next_el.last.state)]
+              [:yield, fn.(next_el[1]), Stream.new(next_fn, next_el.last)]
             else
               raise "#{next_el.inspect} is not a valid stream state!"
             end
-          } * stream.next_item_function
-          Stream.new(next_fn, stream.state) 
+          } 
+          Stream.new(next_fn, stream) 
         } * to_stream
     },
     filter: ->(fn) { 
-        ->(stream) {
-        next_fn = ->(next_el) {
+      from_stream * ->(stream) {
+        next_fn = ->(state) {
+          next_el = state.next_item
           if next_el == [:done]
             [:done]
           elsif next_el.first == :skip || (next_el.first == :yield && !fn.(next_el[1]))
-            [:skip, Stream.new(next_fn, next_el.last.state)]
+            [:skip, Stream.new(next_fn, next_el.last)]
           elsif next_el.first == :yield && fn.(next_el[1])
-            [next_el.first, next_el[1], Stream.new(next_fn, next_el.last.state)]
+            [next_el.first, next_el[1], Stream.new(next_fn, next_el.last)]
           else
             raise "#{next_el.inspect} is not a valid stream state!"
           end
-        } * stream.next_item_function
-        Stream.new(next_fn, stream.state) 
+        }
+        Stream.new(next_fn, stream) 
       } * to_stream
     },
     flatmap: ->(fn) { 
     
-       ->(stream) {
+       from_stream * ->(stream) {
         next_fn = ->(next_el) {
           state = next_el.first
           potential_stream = next_el.last
@@ -266,7 +488,7 @@ class F
       end)
     },
     append: ->(left_stream) {
-      ->(right_stream) {
+      from_stream * ->(right_stream) {
         left_next_fn = ->(next_el) {
           if next_el == [:done]
             [:skip, right_stream]
@@ -284,28 +506,29 @@ class F
       
     } * to_stream,
     zip: ->(left_stream) {
-      ->(right_stream) {
+      from_stream * ->(right_stream) {
         next_fn = ->(state) {
           val_so_far = state.first
-          left_stream = state[1]
-          right_stream = state[2]
+          l_stream = state[1]
+          r_stream = state[2]
+          next_stream = l_stream if val_so_far.empty?
+          next_stream = r_stream if val_so_far.length == 1
+          next_item = next_stream.next_item
           if val_so_far.empty?
-            next_item = left_stream.next_item
-            left_stream = next_item.last
+            l_stream = next_item.last == :done ? empty : next_item.last
           elsif val_so_far.length == 1
-            next_item = right_stream.next_item
-            right_stream = next_item.last
+            r_stream = next_item.last == :done ? empty : next_item.last
           end
           tag = next_item.first
-          val = next_item[1]
-          if tag == :done
+          val = next_item[1] == :done ? nil : next_item[1]
+          if tag == :done && l_stream == empty && r_stream == empty
             [:done]
           elsif tag == :skip
-            [:skip, Stream.new(next_fn, [val_so_far, left_stream, right_stream])]
+            [:skip, Stream.new(next_fn, [val_so_far, l_stream, r_stream])]
           elsif tag == :yield && val_so_far.length == 1
-            [:yield, Stream.new(next_fn, [val_so_far + [val], left_stream, right_stream])]
+            [:yield, val_so_far + [val], Stream.new(next_fn, [[], l_stream, r_stream])]
           elsif tag == :yield
-            [:skip, Stream.new(next_fn, [val_so_far + [val], left_stream, right_stream])]
+            [:skip, Stream.new(next_fn, [val_so_far + [val], l_stream, r_stream])]
           else
             raise "#{next_item} is a malformed stream response!"
           end
@@ -313,23 +536,10 @@ class F
   
       Stream.new(next_fn, [[], left_stream, right_stream])
       } * to_stream
-    },
+    } * to_stream,
   
-    unfoldl: -> (next_fn, stop_fn, seed) { 
-        stream_next_fn = ->(x) {
-          result = next_fn.(x)
-          if result == [:done] || (result.first == :yield && stop_fn.(result[1]))
-            [:done]
-          elsif result.first == :skip
-            [:skip, Stream.new(stream_next_fn, result.last.state)]
-          elsif result.first == :yield
-            [:yield, result[1],  Stream.new(stream_next_fn, result.last.state)]
-          else
-            raise "#{result.inspect} is not of the correct stream result"
-          end
-        }
-      Stream.new(stream_next_fn, seed)
-    }
+    
+
   }
 
   @@stage_1_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
@@ -338,30 +548,44 @@ class F
     double: slf.(plus),
     square: slf.(times),
 
-    ## stream functionals
-    fold: last * scanl,
-
     ## stream functions
+    last: first * -> (stream) { 
+      next_fn = ->(state) {
+        prev_step = state.first
+        strm = state.last
+        raise("Must have at least one item inside of the stream!") if prev_step == [:done]
+        next_item = strm.next_item
+        if prev_step.first == :skip
+          [:skip, Stream.new(next_fn, [next_item, next_item.last])]
+        elsif next_item == [:done]
+          [:yield, prev_step[1], empty]
+        elsif next_item.first == :yield
+          [:skip, Stream.new(next_fn, [next_item, next_item.last])]
+        elsif next_item.first == :skip
+          [:skip, Stream.new(next_fn, [prev_step, next_item.last])]
+        else
+          raise "#{next_item} is a malformed stream result"
+        end
+      }
+      next_item = stream.next_item
+      Stream.new(next_fn, [next_item, next_item.last])
+    } * to_stream,
     uncons: ->(s) { append(first.(l), wrap(rest.(l)))  } * to_stream,
     unsnoc: ->(s) { append(wrap(init.(s)), last.(s)) } * to_stream,
     reverse: foldl.(->(acc, el) { cons.(el, acc) }, []), ## or foldr.(->(el,acc) { snoc.(acc, el) }, [])
     length: foldl.(inc, 0),
     concat: flatmap.(id),
+    enconcat: ->(left_stream, item, right_stream) {
+      append.(left_stream, cons.(item, right_stream))
+    },
     all?: ->(f) { foldl(->(acc, el) { f.(el) && acc }, true) },
     any?: ->(f) { foldl(->(acc, el) { acc || f.(el) }, false) },
     replace: ->(to_replace, to_replace_with) {map.(->(x) { x == to_replace ? to_replace_with : x })},
     replace_with: ->(to_replace_with, to_replace) { map.(->(x) { x == to_replace ? to_replace_with : x }) },
-    replace_by_if: ->(replace_fn, should_replace_fn) { map.( ->(x) { should_replace_fn.(x) ? replace_fn.(x) : x } ) },
-    take: ->(n) {
-
+    find_where: ->(fn) {
+      first * filter.(fn)
     },
-    drop: ->(n) {
-
-    },
-    drop_except: ->(n) {
-
-    },
-
+    
   
     # stream folds useful for containers of booleans
     ands: foldl.(self.and, true),
@@ -371,6 +595,9 @@ class F
     
     maximum: foldl.(max, infinity),
     minimum: foldl.(min, negative_infinity),
+    maximum_by: ->(fn) { foldl.(->(max_so_far, el) { fn.(el) > fn.(max_so_far) ? el : max_so_far}, negative_infinity) },
+    minimum_by:  ->(fn) { foldl.(->(min_so_far, el) { fn.(el) < fn.(min_so_far) ? el : min_so_far}, infinity) },
+
     sum: foldl.(plus, 0),
     product: foldl.(times, 1),
     mean: ->(l) { div_from(*( (sum + length).(l) )) }, ## this works because (sum + length).(l)== [sum.(l), length.(l)]
@@ -388,6 +615,16 @@ class F
   }
 
   @@stage_2_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
+
+  @@stage_3_defs = {
+    contains?: ->(el) { Nothing != find_where(equals.(el)) },
+    does_not_contain?: ->(el) { Nothing == find_where(equals.(el)) },
+
+    ## stream functionals
+    fold: last * scanl,
+    
+  }
+  @@stage_3_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 end
   #std
 
@@ -396,21 +633,10 @@ end
 
 
 
-maximum_by
-minimum_by
+
 
 intercalate = #->(el) { init.(foldl.(, []))}
 intersperse = 
-
-
-take
-drop
-take_while
-drop_while
-take_until
-drop_until
-drop_except/last_n
-enconcat = ->(l, el, r) { l + [el] + r }
 
 intersection
 union
@@ -418,7 +644,7 @@ difference
 cartesian_product
 
 zip_with 
-zip = zip_with.(id)
+zip = zip_with.(list)
 unzip
 updated
 zip_with_index
@@ -431,14 +657,9 @@ first_index_of
 first_index_of_slice
 first_index_where
 
-elem/member/find/contains
 subsequence/containsSlice
 endsWith
 startsWith
-
-notElem
-
-findBy
 
 index/nth
 indexOf
@@ -461,12 +682,13 @@ transpose
 
 grouped
 groupBy
+sliding/window
+
 permutations
 combinations
-sliding/window
+
 sort_by ## insertionSort
 scanr
-scanl
 
 ## functionals useful in untyped languages like ruby - arbitrarily deep map, zip, and merge
 

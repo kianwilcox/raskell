@@ -63,21 +63,22 @@ tests = [
       check.("equal", (g * f).(10), 1)
       check.("equal", (g * g).(10), 10)
     }
-
   ],
 
-  ["able to fuse away two from_stream and to_stream in any order into an Identity.new function",
+  ["able to fuse away a to_stream composed with a from_stream, but not the other way around",
 
     ->() { 
       f = F.to_stream * F.from_stream
-      g = F.to_stream * (F.from_stream * F.to_stream) * F.from_stream
-      h = F.from_stream * (F.to_stream * F.from_stream) * F.to_stream
-      i = F.to_stream * (F.from_stream * F.to_stream) * F.from_stream
+      g = F.to_stream * (F.to_stream * F.from_stream) * F.from_stream
+      h = F.from_stream | (F.from_stream | F.to_stream) | F.to_stream
+      i = F.to_stream | F.from_stream
+      j = F.from_stream * F.to_stream
       ## should be fusing 7 times
       check.("equal", f.class, Identity)
       check.("equal", g.class, Identity)
       check.("equal", h.class, Identity)
-      check.("equal", i.class, Identity)
+      check.("equal", i.class, Proc)
+      check.("equal", i.class, Proc)
     }
 
   ],
@@ -108,11 +109,18 @@ tests = [
 
   #TODO: FILL IN THE TESTS BELOW WITH REAL STUFF
 
-  ["composing a ToStream with a normal lambda on both sides returns a proc",
+  ["composing a ToStream with a normal lambda on both sides returns a ToStream with a before and after",
 
     ->() { 
-      f = ->(x) { x } * F.to_stream * ->(x) { x }
-      check.("equal", f.class, Proc)
+      f = F.to_stream * ->(x) { x }
+      g = ->(x) { x } * f
+      check.("equal", f.class, ToStream)
+      check.("equal", f.before_function.class, Proc)
+      check.("equal", f.after_function, nil)
+      check.("equal", g.after_function.class, Proc)
+      check.("equal", g.before_function.class, Proc)
+      check.("equal", g.class, ToStream)
+
     }
 
   ],
@@ -120,8 +128,14 @@ tests = [
   ["piping a ToStream with a normal lambda returns on both sides returns a proc",
 
     ->() { 
-      f = ->(x) { x } | F.to_stream | ->(x) { x }
-      check.("equal", f.class, Proc)
+      f = ->(x) { x } | F.to_stream 
+      g = f | ->(x) { x }
+      check.("equal", f.class, ToStream)
+      check.("equal", f.before_function.class, Proc)
+      check.("equal", f.after_function, nil)
+      check.("equal", g.after_function.class, Proc)
+      check.("equal", g.before_function.class, Proc)
+      check.("equal", g.class, ToStream)
     }
 
   ],
@@ -129,8 +143,14 @@ tests = [
   ["composing a FromStream with a normal lambda on both sides returns a proc",
 
     ->() { 
-      f = ->(x) { x } * F.from_stream * ->(x) { x }
-      check.("equal", f.class, Proc)
+      f = F.from_stream * ->(x) { x }
+      g = ->(x) { x } * f
+      check.("equal", f.class, FromStream)
+      check.("equal", f.before_function.class, Proc)
+      check.("equal", f.after_function, nil)
+      check.("equal", g.after_function.class, Proc)
+      check.("equal", g.before_function.class, Proc)
+      check.("equal", g.class, FromStream)
     }
 
   ],
@@ -138,17 +158,24 @@ tests = [
   ["piping a FromStream with a normal lambda returns on both sides returns a proc",
 
     ->() { 
-      f = ->(x) { x } | F.from_stream | ->(x) { x }
-      check.("equal", f.class, Proc)
+      f = ->(x) { x } | F.from_stream 
+      g = f | ->(x) { x }
+      check.("equal", f.class, FromStream)
+      check.("equal", f.before_function.class, Proc)
+      check.("equal", f.after_function, nil)
+      check.("equal", g.after_function.class, Proc)
+      check.("equal", g.before_function.class, Proc)
+      check.("equal", g.class, FromStream)
     }
 
   ],
 
+
   ["composing a FromStream with a normal lambda with a ToStream returns a StreamTransducer",
 
     ->() { 
-      f = F.from_stream * F.map.(F.times.(10)) * F.to_stream
-      check.("equal", f.([1,2,3]), [10,20,30])
+      f = F.from_stream * ->(x) { x } * F.to_stream
+      check.("equal", f.([1,2,3].to_stream), [1,2,3])
       check.("equal", f.class, StreamTransducer)
     }
 
@@ -158,8 +185,8 @@ tests = [
 
     ->() { 
       f = F.to_stream | F.map.(F.times.(10)) | F.from_stream
-      check.("equal", f.([1,2,3]), [10,20,30])
       check.("equal", f.class, StreamTransducer)
+      check.("equal", f.([1,2,3]), [10,20,30])
     }
 
   ],
@@ -169,8 +196,10 @@ tests = [
     ->() { 
       f = F.from_stream * F.map.(F.times.(10)) * F.to_stream
       g = F.from_stream * F.map.(F.plus.(10)) * F.to_stream
-      check.("equal", (f*g).([1,2,3]), [110,120,130])
       check.("equal", (f*g).class, StreamTransducer)
+      check.("equal", (f*g).after_function, nil)
+      check.("equal", (f*g).before_function, nil)
+      check.("equal", (f*g).([1,2,3]), [110,120,130])
     }
 
   ],
@@ -186,10 +215,6 @@ tests = [
 
   ],
 
-
-
-
-
   ["composing an arbitrary number of lambdas on only one side of a ToStream doesn't stop it from being fusable with a FromStream on the other",
 
     ->() { 
@@ -198,8 +223,8 @@ tests = [
       check.("equal", f.class, ToStream)
       check.("equal", g.(f.([1])), [22])
       ## there should be a check for fusion here
-      check.("equal", (g * f).class, Proc)
-      check.("equal", (f | g).class, Proc)
+      check.("equal", (g * f).class, StreamTransducer)
+      check.("equal", (f | g).class, StreamTransducer)
     }
 
   ],

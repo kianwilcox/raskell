@@ -741,9 +741,10 @@ tests = [
     ->() { 
       f = F.map.(->(x) { x * 10 })
       g = F.map.(F.times.(10))
-      check.("equal", f.([1,2,3,4].to_stream).to_a, [10,20,30,40])
-      check.("equal", g.([1,2,3,4].to_stream).to_a, [10,20,30,40])
-      check.("equal", f.([1,2,3,4].to_stream).class, Stream)
+      check.("equal", f.([1,2,3,4].to_stream), [10,20,30,40])
+      check.("equal", g.([1,2,3,4].to_stream), [10,20,30,40])
+      check.("equal", f.([1,2,3,4].to_stream).class, Array)
+      #check.("equal", (F.to_stream * f).([1,2,3]).class, Stream)
       
     }
 
@@ -752,12 +753,11 @@ tests = [
   ["filter takes a function and a stream, and returns a new stream that is the result of only keeping items from the original stream that match the function",
 
     ->() { 
-      f = F.filter.(->(x) { x > 2 })
-      g = F.filter.(F.flip.(F.gt.(2)))
-      check.("equal", f.([1,2,3,4].to_stream).to_a, [3,4])
-      check.("equal", g.([1,2,3,4].to_stream).to_a, [3,4])
-      check.("equal", f.([1,2,3,4].to_stream).class, Stream)
-      
+      f = F.filter.(->(x) { 2 < x })
+      g = F.filter.(F.lt.(2))
+      check.("equal", f.([1,2,3,4].to_stream), [3,4])
+      check.("equal", g.([1,2,3,4].to_stream), [3,4])
+      check.("equal", f.([1,2,3,4].to_stream).class, Array)
     }
 
   ],
@@ -770,13 +770,13 @@ tests = [
       h = F.flatmap.(F.wrap)
       i = F.flatmap.(F.wrap * F.times.(10))
       
-      check.("equal", f.([1,2].to_stream).to_a, [1,1,1,2,2,2])
-      check.("equal", g.([1,2].to_stream).to_a, [4,5])
-      check.("equal", h.([1,2].to_stream).to_a, [1,2])
-      check.("equal", i.([1,2].to_stream).to_a, [10,20])
+      check.("equal", f.([1,2].to_stream), [1,1,1,2,2,2])
+      check.("equal", g.([1,2].to_stream), [4,5])
+      check.("equal", h.([1,2].to_stream), [1,2])
+      check.("equal", i.([1,2].to_stream), [10,20])
       
-      check.("equal", f.([1,2].to_stream).class, Stream)
-      check.("equal", h.([1,2].to_stream).class, Stream)
+      check.("equal", f.([1,2].to_stream).class, Array)
+      check.("equal", h.([1,2].to_stream).class, Array)
       
     }
 
@@ -802,23 +802,20 @@ tests = [
     }
 
   ],
-=begin TODO LATER
   ["append should take two streams, and produce a stream that is the result of concatenating the two streams together",
 
     ->() { 
       f = F.append
-      check.("equal", F.from_stream <= f.([1,2,3,4].to_stream).([5,6,7,8].to_stream), [1,2,3,4,5,6,7,8])
-      check.("equal", f.([1,2,3,4].to_stream).([5,6,7,8].to_stream).class, Stream)
+      check.("equal", f.([1,2,3,4,0]).([5,6,7,8]), [1,2,3,4,5,6,7,8])
     }
 
   ],
-=end
   ["scanl should produce a stream of intermediate foldl results",
 
     ->() { 
       f = F.scanl.(F.plus, 0)
-      check.("equal", F.from_stream <= f.([1,2,3,4].to_stream), [1,3,6,10])
-      check.("equal", f.([1,2,3,4].to_stream), Stream)
+      check.("equal", f.([1,2,3,4]), [1,3,6,10])
+      #check.("equal", f.([1,2,3,4].to_stream), Stream)
     }
 
   ],
@@ -827,8 +824,7 @@ tests = [
 
     ->() { 
       f = F.zip
-      check.("equal", f.([1,2,3,4,0].to_stream).([5,6,7,8].to_stream).to_a, [[1,5], [2,6], [3,7], [4,8]])
-      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream).class, Stream)
+      check.("equal", f.([1,2,3,4,0]).([5,6,7,8]), [[1,5], [2,6], [3,7], [4,8]])
     }
 
   ],

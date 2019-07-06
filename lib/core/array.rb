@@ -53,7 +53,7 @@ class Array
   end
 
   def self.next_item
-    next_fn = ->(xs) { xs == nil || (xs.respond_to?(:empty?) && xs.empty?) ? [:done] : [:yield, xs.first, Stream.new(next_fn, xs.drop(1))] }
+    next_fn = ->(xs) { xs.empty? ? [:done] : [:yield, xs.first, Stream.new(next_fn, xs.drop(1))] }
     next_fn
   end
 

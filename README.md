@@ -40,6 +40,11 @@ Arrays, when called, map across themselves calling each element with the argumen
 ```[plus, times10, 3].(0,1)``` evaluates to ```[1, 0, 3]```
 Note that ```[plus,times10,3][0,1]``` evaluates to ```[plus]```, not ```[1, 0, 3]```, so be careful where you use ```func[]``` as shorthand ```func.()``` or ```func.call()```!
 
+Streams, when called, map across themselves calling each element with the arguments it was called with
+```[times10, minus3, double].to_stream.(5)``` evaluates to ```5```
+```[plus, times10, 3].to_stream.(0,1)``` evaluates to ```[1, 0, 3].to_stream```
+Note that ```[plus,times10,3].to_stream[0,1]``` evaluates to ```[plus].to_stream```, not ```[1, 0, 3].to_stream```, so be careful where you use ```func[]``` as shorthand ```func.()``` or ```func.call()```!
+
 Preface any collection function with F. to call that particular function
 ```F.map(times10 * plus10).([1,2,3])``` evaluates as ```[100, 200, 300]```
 
@@ -51,3 +56,4 @@ III) a standard collections library based around fusable stream transducers - (f
 V) add tupling for stream transducers as well, so that multiple transducers can run in parallel across the same stream in a single pass, w/ tests
 VI) add instances of from_stream(ClassName=Array) and to_stream for Dictionary, (Multi?)Set, Array, Range, Integer, and Object
 VII) Make everything that isn't a function a 'constant' function that implicitly pushes to an ArgumentStack once lifted, and then returns the ArgumentStack. Modify lambda calling to properly use argument stack if it is passed in.
+
