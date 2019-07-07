@@ -1,4 +1,15 @@
 class Stream
+  include Enumerable
+
+  def each(&fn)
+    item = self.next_item
+    while item != [:done]
+      fn.call(item[1]) if item.first == :yield
+      item = item.last.next_item
+    end
+    self
+  end
+
   attr_accessor :state
   def initialize(next_item, state)
     @next_item = next_item
@@ -427,7 +438,7 @@ class StreamTransducer
   def *(lamb)
     if lamb.kind_of?(Identity)
       self
-    elsif [FromStream, ToStream, StreamTransducer].include?(lamb.class)
+    elsif [ToStream, StreamTransducer].include?(lamb.class)
       ## then fuse away the streams by just making this the Identity.new function
       self.fuse(lamb, self)
     else
