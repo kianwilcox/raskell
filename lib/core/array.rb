@@ -81,27 +81,26 @@ class Array
   
 end
 
-class Object
-  def self.empty
-    Self.new
-  end
-end
-
 class Set
-  def self.empty
-    self.new
+
+  def push(item)
+    self << item
+    self
   end
+
 end
 
 class Hash
 
-  def self.empty
-    {}
+  def <<(keyval)
+    raise("Can only push pairs into a dictionary") unless (pair.kind_of?(Array) || pair.kind_of?(Stream))
+    self[pair.first]=pair.last
+    self
   end
 
   def push(pair)
-    raise("Can only push pairs into a dictionary") unless (pair.kind_of?(Array) || pair.kind_of?(Stream))
-    self[pair.first]=pair.last
+    self <<(pair)
+    self
   end
 
   def to_stream
@@ -125,3 +124,13 @@ class Hash
   end
 
 end
+
+# class Range
+#   def to_stream
+#     F.range(self.min, self.max)
+#   end
+
+#   def self.to_stream(range)
+#     F.range.(range.min, range.max)
+#   end
+# end

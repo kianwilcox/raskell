@@ -25,11 +25,11 @@ class F
     negative_infinity: -Float::INFINITY, 
     inf: Float::INFINITY,
     ninf: -Float::INFINITY,
-    id: Identity.new,
+    id: Identity.new, # ->(x) { x }
     apply: ->(f, x) { f.(x) },
-    apply_with: ->(x,f) { f.(x) },
+    apply_with: ->(x,f) { f.(x) }, # flip * apply
     flip: -> (f,x,y) { f.(y,x) },
-    slf: -> (f, x) { f.(x,x) },
+    slf: -> (f, x) { f.(x,x) }, ## square = slf * times
     fix: ->(f, x) { 
       result = x
       next_result = f.(x)
@@ -38,22 +38,37 @@ class F
         next_result = f.(result)
       end
       result
-    },
-
-    step: ->(step_fn, stop_fn) { ## if next_fn returns nothing, skip
-      next_fn = ->(next_item) {
-        tag = next_item.first
-        val = next_item[1]
-        next_stream = next_item.last
-        next_val = next_fn.(val) if tag == :yield
-        if tag == :done || (tag == :yield && stop_fn.(val))
+    },   
+    ## next_stream_fn yields Nothing for stop, and the next stream to go to otherwise
+    ## yield_fn yields a Nothing for skip, and the next value to yield otherwise
+    step: ->(next_stream_fn, yield_fn) {
+      ## next_stream_fn :: state -> next_fn -> Maybe(stream)
+      ## yield_fn :: state -> Maybe(item)
+      next_fn = ->(state) {
+        next_stream = next_stream_fn.(state)
+        to_yield = yield_fn.(state) if to_skip != Nothing
+        if next_stream == Nothing
           [:done]
-        elsif tag == :skip || next_val == Nothing
-          [:skip, Stream.new(next_fn, next_stream)]
-        elsif tag == :yield
-          [:yield, next_val, Stream.new(next_fn, next_stream)]
+        elsif to_yield == Nothing
+          [:skip, next_stream]
         else
-          raise "#{next_item.inspect} is a malformed stream response!\nExpected one of [:done], [:skip, stream], [:yield, item, stream]"
+          [:yield, to_yield, next_stream]
+        end
+      }
+      next_fn
+    },
+    simple_step: ->(transition_fn, yield_fn) {
+      ## transition_fn :: state -> Maybe(state)
+      ## yield_fn :: state -> Maybe(item)
+      next_fn = ->(state) {
+        next_state = transition_fn.(state)
+        to_yield = yield_fn.(state) if next_state != Nothing
+        if next_state == Nothing
+          [:done]
+        elsif to_yield == Nothing
+          [:skip, Stream.new(next_fn, next_state)]
+        else
+          [:yield, to_yield, Stream.new(next_fn, next_state)]
         end
       }
       next_fn
@@ -93,50 +108,65 @@ class F
       next_fn = ->(bool) { bool ? [:yield, x, Stream.new(next_fn, false)] : [:done]}
       Stream.new(next_fn, true)
     },
+
     cons: ->(el) { 
-      from_stream * ->(stream) {
+      ->(stream) {
         Stream.new(->(x) { [:yield, el, stream] } , Nothing) 
       } * to_stream
     },
 
-    ## lists
-    list: ->(*items) {
-      items
-    }
-  }
 
-  @@stage_0_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
+    first: -> (stream) { ## should offer an equivalent that returns a stream with a single element
+      next_item = stream.next_item
+      while next_item.first == :skip
+        next_item = next_item.last.next_item
+      end
+      next_item.first == :yield ? next_item[1] : Nothing
+    } * to_stream,
 
-
-  @@stage_0_5_defs={
-    unfoldl: -> (next_fn, stop_fn, seed) { 
-      stream_next_fn = ->x { x }
-      Stream.new(stream_next_fn, seed)
-    },
-    transducer: ->(next_val_fn, next_state_fn, stop_fn) {
-      from_stream * ->(stream) {
-        next_fn = ->(state) {
-          if stop_fn.(state)
-            [:done]
-          elsif (next_val = next_val_fn.(state)) == Nothing
-            [:skip, next_state_fn.(state)]
-          else
-            [:yield,  next_val_fn.(state), next_state_fn.(state)]
-          end
-        }
-        Stream.new(next_fn, stream)
+    rest: -> (stream) { 
+      next_item = stream.next_item.last
+      next_item == [:done] ? Nothing : next_item.last
+    } * to_stream,
+    
+    zip_with: ->(fn) {
+      ->(left_stream) {
+        ->(right_stream) {
+          next_fn = ->(state) {
+            val_so_far = state.first
+            l_stream = state[1]
+            r_stream = state[2]
+            next_stream = l_stream if val_so_far.empty?
+            next_stream = r_stream if val_so_far.length == 1
+            next_item = next_stream.next_item
+            if val_so_far.empty?
+              l_stream = next_item.last == :done ? empty : next_item.last
+            elsif val_so_far.length == 1
+              r_stream = next_item.last == :done ? empty : next_item.last
+            end
+            tag = next_item.first
+            val = next_item[1] == :done ? nil : next_item[1]
+            if tag == :done && l_stream == empty && r_stream == empty
+              [:done]
+            elsif tag == :skip
+              [:skip, Stream.new(next_fn, [val_so_far, l_stream, r_stream])]
+            elsif tag == :yield && val_so_far.length == 1
+              [:yield, fn.(*(val_so_far + [val])), Stream.new(next_fn, [[], l_stream, r_stream])]
+            elsif tag == :yield
+              [:skip, Stream.new(next_fn, [val_so_far + [val], l_stream, r_stream])]
+            else
+              raise "#{next_item} is a malformed stream response!"
+            end
+          }
+    
+        Stream.new(next_fn, [[], left_stream, right_stream])
+        } * to_stream
       } * to_stream
     },
-  }
-  @@stage_0_5_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
-
-  @@stage_1_defs = {
-
-    ## stream functions
 
     take: ->(n) {
       raise("#{n} must be a positive number") if n < 0
-      from_stream * ->(stream) {
+      ->(stream) {
         next_fn = ->(state) {
           countdown = state.first
           strm = state.last
@@ -152,7 +182,7 @@ class F
             elsif tag == :skip
               [:skip, [countdown, next_strm]]
             elsif tag == :yield
-              [:yield, val, [countdown-1, ]]
+              [:yield, val, [countdown-1, next_strm]]
             else
               raise "#{next_item} is a malformed stream response!"
             end
@@ -163,7 +193,7 @@ class F
     }, 
     drop: ->(n) {
       raise("#{n} must be a positive number") if n < 0
-      from_stream * ->(stream) {
+      ->(stream) {
         next_fn = ->(state) {
           countdown = state.first
           strm = state.last
@@ -190,7 +220,7 @@ class F
     }, 
     drop_except: ->(n) {
       raise("#{n} must be a positive number") if n < 0
-      from_stream * ->(stream) {
+      ->(stream) {
         next_fn = ->(strm) { 
           potential_stream = take.(n+1) <= strm
           if (length.(potential_stream)) < n+1
@@ -215,9 +245,30 @@ class F
       } * to_stream
     },
 
+    init: ->(stream) { 
+                       #### call it a step-transformer, or step-transducer, or just a step function or stepper
+                       #### write a function that produces a function that processes a single next item
+                       #### it should take a function for what to do when it's done, when it's skip, and when it's yield
+                       #### and those functions should yield 'step's in a stream
+      next_fn = ->(next_item) {
+        if next_item == [:done]
+          raise "init requires a stream length of at least 1"
+        elsif next_item.first == :skip 
+          [:skip, Stream.new(next_fn, next_item.last)]
+        elsif next_item.first == :yield && next_fn.(next_item.last) == [:done]
+          [:done]
+        elsif next_item.first == :yield
+          [:yield, next_item[1], Stream.new(next_fn, next_item.last)]
+        else
+          raise "#{next_item} is a malformed stream response"
+        end
+      } * s.next_item_function
+      Stream.new(next_fn, stream)
+    } * to_stream,
+
     take_while: ->(fn) {
       raise("take_while requires a function") unless fn.kind_of?(Proc)
-      from_stream * ->(stream) {
+      ->(stream) {
         next_fn = ->(state) {
             tag = next_item.first
             val = next_item[1]
@@ -238,7 +289,7 @@ class F
 
     drop_while: ->(fn) {
       raise("drop_while requires a function") unless fn.kind_of?(Proc)
-      from_stream * ->(stream) {
+      ->(stream) {
         next_fn = ->(next_item) {
             tag = next_item.first
             val = next_item[1]
@@ -259,7 +310,7 @@ class F
 
     take_until: ->(fn) {
       raise("take_until requires a function") unless fn.kind_of?(Proc)
-      from_stream * ->(stream) {
+      ->(stream) {
         next_fn = ->(state) {
             tag = next_item.first
             val = next_item[1]
@@ -280,7 +331,7 @@ class F
 
     drop_until: ->(fn) {
       raise("drop_until requires a function") unless fn.kind_of?(Proc)
-      from_stream * ->(stream) {
+      ->(stream) {
         next_fn = ->(next_item) {
             tag = next_item.first
             val = next_item[1]
@@ -298,43 +349,30 @@ class F
         Stream.new(next_fn, [n, stream])
       } * to_stream
     },
-    first: -> (stream) { ## should offer an equivalent that returns a stream with a single element
-      next_item = stream.next_item
-      while next_item.first == :skip
-        next_item = next_item.last.next_item
-      end
-      next_item.first == :yield ? next_item[1] : Nothing
-    } * to_stream,
-    rest: from_stream * -> (stream) { 
-      next_item = stream.next_item.last
-      next_item == [:done] ? Nothing : next_item.last
-    } * to_stream,
-    init: from_stream * ->(stream) { 
-                       #### call it a step-transformer, or step-transducer, or just a step function or stepper
-                       #### write a function that produces a function that processes a single next item
-                       #### it should take a function for what to do when it's done, when it's skip, and when it's yield
-                       #### and those functions should yield 'step's in a stream
-      next_fn = ->(next_item) {
-        if next_item == [:done]
-          raise "init requires a stream length of at least 1"
-        elsif next_item.first == :skip 
-          [:skip, Stream.new(next_fn, next_item.last)]
-        elsif next_item.first == :yield && next_fn.(next_item.last) == [:done]
-          [:done]
-        elsif next_item.first == :yield
-          [:yield, next_item[1], Stream.new(next_fn, next_item.last)]
-        else
-          raise "#{next_item} is a malformed stream response"
-        end
-      } * s.next_item_function
-      Stream.new(next_fn, stream)
-    } * to_stream,
+
+    ## lists
+    list: ->(*items) { items }
+  }
+
+  @@stage_0_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
+
+
+  @@stage_0_5_defs={
     snoc: ->(el) {
-       from_stream * ->(stream) { 
+
+       ->(stream) { 
+        # next_fn = step.(->(stream) {
+        #     next_item = stream.next_item
+        #     next_item == [:done] ? wrap.(el) : next_item.last
+        #   }, 
+        #   ->(stream) {
+        #     next_item = stream.next_item
+        #     next_item.first == :skip ? Nothing : next_item[1]
+        # })
         next_fn = ->(s) {
           next_item = s.next_item
           if next_item == [:done]
-            [:skip, swrap.(el)]
+            [:skip, wrap.(el)]
           elsif next_item.first == :skip
             [:skip, Stream.new(next_fn, next_item.last)]
           elsif next_item.first == :yield
@@ -346,6 +384,30 @@ class F
         Stream.new(next_fn, stream)
       } * to_stream
     },
+    zip: zip_with.(list),
+
+    unfoldl: -> (next_fn, stop_fn, seed) { 
+      stream_next_fn = ->x { x }
+      Stream.new(stream_next_fn, seed)
+    },
+    transducer: ->(next_val_fn, next_state_fn, stop_fn) {
+      ->(stream) {
+        next_fn = ->(state) {
+          if stop_fn.(state)
+            [:done]
+          elsif (next_val = next_val_fn.(state)) == Nothing
+            [:skip, next_state_fn.(state)]
+          else
+            [:yield,  next_val_fn.(state), next_state_fn.(state)]
+          end
+        }
+        Stream.new(next_fn, stream)
+      } * to_stream
+    },
+  }
+  @@stage_0_5_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
+
+  @@stage_1_defs = {
   
     ## functional combinators - higher-order functions generic over their container
     foldl: ->(f,u) { 
@@ -387,7 +449,7 @@ class F
     },
 
     scanl: ->(f,u) { 
-      from_stream * ->(stream) {
+      ->(stream) {
         next_fn = ->(state) {
           result_so_far = state.first
           strm = state.last
@@ -410,8 +472,9 @@ class F
       } * to_stream
     
     },
+
     map: ->(fn) { 
-        from_stream * ->(stream) {
+        ->(stream) {
           next_fn = ->(state) {
             next_el = state.next_item
             if next_el == [:done]
@@ -428,7 +491,7 @@ class F
         } * to_stream
     },
     filter: ->(fn) { 
-      from_stream * ->(stream) {
+      ->(stream) {
         next_fn = ->(state) {
           next_el = state.next_item
           if next_el == [:done]
@@ -446,7 +509,7 @@ class F
     },
     flatmap: ->(fn) { 
     
-       from_stream * ->(stream) {
+       ->(stream) {
         next_fn = ->(next_el) {
           state = next_el.first
           potential_stream = next_el.last
@@ -488,7 +551,7 @@ class F
       end)
     },
     append: ->(left_stream) {
-      from_stream * ->(right_stream) {
+      ->(right_stream) {
         left_next_fn = ->(next_el) {
           if next_el == [:done]
             [:skip, right_stream]
@@ -505,51 +568,7 @@ class F
       } * to_stream
       
     } * to_stream,
-    zip: ->(left_stream) {
-      from_stream * ->(right_stream) {
-        next_fn = ->(state) {
-          val_so_far = state.first
-          l_stream = state[1]
-          r_stream = state[2]
-          next_stream = l_stream if val_so_far.empty?
-          next_stream = r_stream if val_so_far.length == 1
-          next_item = next_stream.next_item
-          if val_so_far.empty?
-            l_stream = next_item.last == :done ? empty : next_item.last
-          elsif val_so_far.length == 1
-            r_stream = next_item.last == :done ? empty : next_item.last
-          end
-          tag = next_item.first
-          val = next_item[1] == :done ? nil : next_item[1]
-          if tag == :done && l_stream == empty && r_stream == empty
-            [:done]
-          elsif tag == :skip
-            [:skip, Stream.new(next_fn, [val_so_far, l_stream, r_stream])]
-          elsif tag == :yield && val_so_far.length == 1
-            [:yield, val_so_far + [val], Stream.new(next_fn, [[], l_stream, r_stream])]
-          elsif tag == :yield
-            [:skip, Stream.new(next_fn, [val_so_far + [val], l_stream, r_stream])]
-          else
-            raise "#{next_item} is a malformed stream response!"
-          end
-        }
-  
-      Stream.new(next_fn, [[], left_stream, right_stream])
-      } * to_stream
-    } * to_stream,
-  
-    
-
-  }
-
-  @@stage_1_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
-
-  @@stage_2_defs = {
-    double: slf.(plus),
-    square: slf.(times),
-
-    ## stream functions
-    last: first * -> (stream) { 
+    final: -> (stream) { 
       next_fn = ->(state) {
         prev_step = state.first
         strm = state.last
@@ -570,6 +589,18 @@ class F
       next_item = stream.next_item
       Stream.new(next_fn, [next_item, next_item.last])
     } * to_stream,
+    
+
+  }
+
+  @@stage_1_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
+
+  @@stage_2_defs = {
+    double: slf.(plus),
+    square: slf.(times),
+
+    ## stream functions
+    last: first * final,
     uncons: ->(s) { append(first.(l), wrap(rest.(l)))  } * to_stream,
     unsnoc: ->(s) { append(wrap(init.(s)), last.(s)) } * to_stream,
     reverse: foldl.(->(acc, el) { cons.(el, acc) }, []), ## or foldr.(->(el,acc) { snoc.(acc, el) }, [])
@@ -585,7 +616,7 @@ class F
     find_where: ->(fn) {
       first * filter.(fn)
     },
-    
+    transpose: ->(stream_of_streams) { zip.( *(stream_of_streams.to_a) ) },
   
     # stream folds useful for containers of booleans
     ands: foldl.(self.and, true),
@@ -617,11 +648,14 @@ class F
   @@stage_2_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 
   @@stage_3_defs = {
-    contains?: ->(el) { Nothing != find_where(equals.(el)) },
-    does_not_contain?: ->(el) { Nothing == find_where(equals.(el)) },
+    contains?: ->(el) { Nothing != find_where.(equals.(el)) },
+    does_not_contain?: ->(el) { Nothing == find_where.(equals.(el)) },
 
     ## stream functionals
-    fold: last * scanl,
+    #init: take_except.(1),
+    fold: final * scanl,
+    slice_by: ->(starts_with_fn, ends_with_fn) { take_until.(ends_with_fn) * drop_until.(starts_with_fn) * to_stream },
+    interleave: concat * transpose,
     
   }
   @@stage_3_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
@@ -638,13 +672,12 @@ end
 intercalate = #->(el) { init.(foldl.(, []))}
 intersperse = 
 
+
 intersection
 union
 difference
 cartesian_product
 
-zip_with 
-zip = zip_with.(list)
 unzip
 updated
 zip_with_index
@@ -670,6 +703,8 @@ findIndex
 random
 randomN
 
+
+slice_by
 partition_at
 partition_by
 split_by
@@ -678,10 +713,11 @@ splice
 patch
 span
 
-transpose
+
 
 grouped
 groupBy
+groupByAndFoldWith == fmap.(fold(with_fn, unit)) * group_by 
 sliding/window
 
 permutations

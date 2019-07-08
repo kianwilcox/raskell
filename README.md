@@ -57,3 +57,25 @@ V) add tupling for stream transducers as well, so that multiple transducers can 
 VI) add instances of from_stream(ClassName=Array) and to_stream for Dictionary, (Multi?)Set, Array, Range, Integer, and Object
 VII) Make everything that isn't a function a 'constant' function that implicitly pushes to an ArgumentStack once lifted, and then returns the ArgumentStack. Modify lambda calling to properly use argument stack if it is passed in.
 
+
+
+Available Operators to Overload in Ruby
+
+(unary)
+!, ~, +, \- 
+
+(binary)
+\*\*, \*, /, %, +, \-, <<, >>, &, \|, ^, ||. &&
+<, <=, =>, >, ==, ===, !=, =~, !~, <=>
+[],[]=
+
+Using in Raskell so far
+[]/[]=, \*, \|, +, <=, >=
+
+
+
+=~ and !~ will be good for later when I have 'regular expressions' over arbitrary asterated semirings
+
+
+
+

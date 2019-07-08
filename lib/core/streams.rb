@@ -21,12 +21,12 @@ class Stream
   def ==(stream)
     if stream.respond_to?(:to_stream)
       stream = stream.to_stream
-      next1 = self.next_item
-      next2 = stream.next_item
+      next1 = self.another
+      next2 = stream.another
       equal_so_far = next1 == next2 || (next1.first != :skip && next1[1] == next2[1])
       while equal_so_far && !(next1 == [:done] || next2 == [:done])
-        next1 = next1.last.next_item
-        next2 = next2.last.next_item
+        next1 = next1.last.another
+        next2 = next2.last.another
         equal_so_far = next1 == next2
       end
       equal_so_far
@@ -38,12 +38,12 @@ class Stream
   def ===(stream)
     if stream.respond_to?(:to_stream)
       stream = stream.to_stream
-      next1 = self.next_item
-      next2 = stream.next_item
+      next1 = self.another
+      next2 = stream.another
       equal_so_far = next1 == next2 || (next1.first != :skip && next1[1] === next2[1])
       while equal_so_far && !(next1 == [:done] || next2 == [:done])
-        next1 = next1.last.next_item
-        next2 = next2.last.next_item
+        next1 = next1.last.another
+        next2 = next2.last.another
         equal_so_far = next1 === next2
       end
       equal_so_far
@@ -75,6 +75,14 @@ class Stream
   def next_item_function
     @next_item
   end 
+
+  def another
+    item = self.next_item
+    while item.first == :skip
+      item = item.last.next_item
+    end
+    item
+  end
 
   def foldl(func, unit)
     from_stream.foldl(func, unit)

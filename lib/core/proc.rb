@@ -20,6 +20,8 @@ class Proc
     elsif args.length == 0
       #interpret application with no arguments on a non-zero-arity function as a no-op
       return self
+    elsif !args_to_consume.respond_to?(:length) ## then we're dealing with a *args-based lambda. just apply them all
+      result = self.standard_ruby_call(*args)
     elsif args_to_consume.length < self.arity
       #if you have too few arguments, return a lambda asking for more before attempting to re-apply
       return ->(x) { self.call( *( args + [x] ) ) }

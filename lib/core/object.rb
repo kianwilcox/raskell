@@ -1,5 +1,9 @@
 class Object
 
+  def self.empty
+    Self.new
+  end
+
   def fmap(fn)
   	fn.(self)
   end

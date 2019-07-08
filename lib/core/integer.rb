@@ -1,4 +1,8 @@
 class Integer
+  def self.empty
+    0
+  end
+
   def foldl(func, unit)
     i = 0
     while i <= self

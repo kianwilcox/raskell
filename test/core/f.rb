@@ -741,9 +741,9 @@ tests = [
     ->() { 
       f = F.map.(->(x) { x * 10 })
       g = F.map.(F.times.(10))
-      check.("equal", f.([1,2,3,4].to_stream), [10,20,30,40])
-      check.("equal", g.([1,2,3,4].to_stream), [10,20,30,40])
-      check.("equal", f.([1,2,3,4].to_stream).class, Array)
+      check.("equal", f.([1,2,3,4]), [10,20,30,40])
+      check.("equal", g.([1,2,3,4]), [10,20,30,40])
+      check.("equal", f.([1,2,3,4]).class, Stream)
       #check.("equal", (F.to_stream * f).([1,2,3]).class, Stream)
       
     }
@@ -755,9 +755,9 @@ tests = [
     ->() { 
       f = F.filter.(->(x) { 2 < x })
       g = F.filter.(F.lt.(2))
-      check.("equal", f.([1,2,3,4].to_stream), [3,4])
-      check.("equal", g.([1,2,3,4].to_stream), [3,4])
-      check.("equal", f.([1,2,3,4].to_stream).class, Array)
+      check.("equal", f.([1,2,3,4]), [3,4])
+      check.("equal", g.([1,2,3,4]), [3,4])
+      check.("equal", f.([1,2,3,4]).class, Stream)
     }
 
   ],
@@ -775,8 +775,8 @@ tests = [
       check.("equal", h.([1,2].to_stream), [1,2])
       check.("equal", i.([1,2].to_stream), [10,20])
       
-      check.("equal", f.([1,2].to_stream).class, Array)
-      check.("equal", h.([1,2].to_stream).class, Array)
+      check.("equal", f.([1,2].to_stream).class, Stream)
+      check.("equal", h.([1,2].to_stream).class, Stream)
       
     }
 
@@ -799,6 +799,7 @@ tests = [
       check.("equal", g.class, Stream)
       check.("equal", h.class, Stream)
       check.("equal", i.class, Stream)
+      check.("equal", j.class, Stream)
     }
 
   ],
@@ -807,15 +808,17 @@ tests = [
     ->() { 
       f = F.append
       check.("equal", f.([1,2,3,4]).([5,6,7,8]), [1,2,3,4,5,6,7,8])
+      check.("equal", f.([1,2,3,4]).([5,6,7,8]).class, Stream)
     }
 
   ],
+
   ["scanl should produce a stream of intermediate foldl results",
 
     ->() { 
       f = F.scanl.(F.plus, 0)
       check.("equal", f.([1,2,3,4]), [1,3,6,10])
-      #check.("equal", f.([1,2,3,4].to_stream), Stream)
+      check.("equal", f.([1,2,3,4]).class, Stream)
     }
 
   ],
@@ -825,6 +828,7 @@ tests = [
     ->() { 
       f = F.zip
       check.("equal", f.([1,2,3,4,0]).([5,6,7,8]), [[1,5], [2,6], [3,7], [4,8]])
+      check.("equal", f.([1,2,3,4,0]).([5,6,7,8]).class, Stream)
     }
 
   ],
