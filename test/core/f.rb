@@ -155,6 +155,57 @@ tests = [
 
   ## The foundational functions
 
+  ["to_stream works on an Array, Hash, or Set depending on what you pass it",
+
+    ->() { 
+      f = F.to_stream
+      check.("equal", f.([1,2,3]), [1,2,3])
+      check.("equal", f.(Set.new([1,2,3,2,3])), [1,2,3])
+      check.("equal", f.({'one' => 1, "two" => 2, "three" => 3}).to_a, [["one", 1],["three", 3], ["two", 2],]) ## by default orders by key
+      check.("equal", f.([1,2,3]).class, Stream)
+      check.("equal", f.(Set.new([1,2,3,2,3])).class, Stream)
+      check.("equal", f.({'one' => 1, "two" => 2, "three" => 3}).class, Stream)
+    }
+
+  ],
+
+
+  ["from_stream on a stream equals an Array, Hash, or Set depending on what you pass it",
+
+    ->() { 
+      f = F.to_a
+      g = F.to_h
+      h = F.to_set
+      s1 = [1,2,3,4].to_stream
+      s2 = ["one", "two", "three", "four"].to_stream
+      s3 = [3,4,5,6].to_stream
+      check.("equal", f.(s1).class, Array)
+      check.("equal", f.(s1), [1,2,3,4])
+      check.("equal", g.(s2.to_a.zip(s1.to_a).to_stream).class, Hash)
+      check.("equal", g.(s2.to_a.zip(s1.to_a).to_stream), {"one"=>1, "two"=>2, "three"=>3, "four"=>4})
+      check.("equal", h.(s1).class, Set)
+      check.("equal", h.(s1), Set.new(s1))
+    }
+
+  ],
+
+  ["apply.(f,x) equals f.(x)",
+
+    ->() { 
+      f = ->(x) { x * 2 }
+      check.("equal", F.apply.(f, 2), 4)
+    }
+
+  ],
+
+  ["apply_with.(x,f) equals f.(x)",
+
+    ->() { 
+      f = ->(x) { x * 2 }
+      check.("equal", F.apply_with.(2,f), 4)
+    }
+
+  ],
 
   ["id.(x) equals x",
 
@@ -190,6 +241,42 @@ tests = [
     ->() { 
       f = F.fix.(->(x) { x < 5  ?  x  :  x - 1 })
       check.("equal", f.(10), 4)
+    }
+
+  ],
+
+  ## then booleans
+
+  ["the basic boolean functions all work",
+
+    ->() { 
+      check.("equal", F.not.(true), false)
+      check.("equal", F.not.(false), true)
+      
+      check.("equal", F.and.(true, true), true)
+      check.("equal", F.and.(true, false), false)
+      check.("equal", F.and.(false, true), false)
+      check.("equal", F.and.(false, false), false)
+
+      check.("equal", F.nand.(true, true), false)
+      check.("equal", F.nand.(true, false), true)
+      check.("equal", F.nand.(false, true), true)
+      check.("equal", F.nand.(false, false), true)
+
+      check.("equal", F.or.(true, true), true)
+      check.("equal", F.or.(true, false), true)
+      check.("equal", F.or.(false, true), true)
+      check.("equal", F.or.(false, false), false)
+
+      check.("equal", F.nor.(true, true), false)
+      check.("equal", F.nor.(true, false), false)
+      check.("equal", F.nor.(false, true), false)
+      check.("equal", F.nor.(false, false), true)
+      
+      check.("equal", F.xor.(true, true), false)
+      check.("equal", F.xor.(true, false), true)
+      check.("equal", F.xor.(false, true), true)
+      check.("equal", F.xor.(false, false), false)
     }
 
   ],
@@ -725,6 +812,17 @@ tests = [
 
   ],
 
+  ["empty returns a stream whose next_item is [:done]",
+
+    ->() { 
+      check.("equal", F.empty.class, Stream)
+      check.("equal", F.empty.next_item, [:done])
+      check.("equal", F.empty, [])
+      
+    }
+
+  ],
+
   ["wrap takes a single element and wraps it into a single-element stream",
 
     ->() { 
@@ -736,6 +834,42 @@ tests = [
 
   ],
 
+  ["cons takes an element and a stream and returns a new stream with the element added to the front of the old stream",
+
+    ->() { 
+      f = F.cons
+      check.("equal", f.(1,[2,3,4]), [1,2,3,4])
+      check.("equal", f.(1,[2,3,4]).class, Stream)
+      
+    }
+
+  ],
+
+  ["first takes a stream and returns the first element, or raises an exception if there is none",
+
+    ->() { 
+      f = F.first
+      check.("equal", f.([2,3,4].to_stream), 2)
+      check.("raises", -> { f.(F.empty) }, "first")
+      
+    }
+
+  ],
+
+  ["rest takes a stream and returns the rest of the stream after discarding the first element, or raises an exception if there is none",
+
+    ->() { 
+      f = F.rest
+      check.("equal", f.([2,3,4].to_stream), [3,4])
+      check.("equal", f.([2,3,4].to_stream).class, Stream)
+      check.("raises", -> { f.(F.empty) }, "foobar")
+      
+    }
+
+  ],
+
+  ## TODO NEXT: takes, drops, zip_with
+
   ["map takes a function and a stream and returns a new stream that applies this function to every element in the old stream",
 
     ->() { 
@@ -743,7 +877,7 @@ tests = [
       g = F.map.(F.times.(10))
       check.("equal", f.([1,2,3,4]), [10,20,30,40])
       check.("equal", g.([1,2,3,4]), [10,20,30,40])
-      check.("equal", f.([1,2,3,4]).class, Stream)
+      #check.("equal", f.([1,2,3,4]).class, Stream)
       #check.("equal", (F.to_stream * f).([1,2,3]).class, Stream)
       
     }

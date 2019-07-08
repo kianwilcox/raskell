@@ -173,7 +173,7 @@ class FromStream
     next_val = stream.next_item
     while next_val.first != :done
       #puts next_val.inspect
-      result.push(next_val[1]) if next_val.first == :yield
+      result << next_val[1] if next_val.first == :yield
       next_val = next_val.last.next_item
     end
     result

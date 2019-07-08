@@ -18,9 +18,30 @@ class F
     end
   end
 
+  def self.to_array
+    FromStream.new(Array)
+  end
+
+  def self.to_hash
+    FromStream.new(Hash)
+  end
+
+  def self.to_set
+    FromStream.new(Set)
+  end
+
+  def self.to_a
+    self.to_array
+  end
+
+  def self.to_h
+    self.to_hash
+  end
+
   include Singleton
 
   @@stage_0_defs = {
+
     infinity: Float::INFINITY,
     negative_infinity: -Float::INFINITY, 
     inf: Float::INFINITY,
@@ -79,6 +100,7 @@ class F
     and: ->(x,y) { x && y },
     nand: ->(x,y) { !(x && y) },
     or: ->(x,y) { x || y },
+    nor: ->(x,y) { !x && !y },
     xor: ->(x,y) { !(x && y) && (x || y) },
 
     ## numbers
@@ -128,41 +150,6 @@ class F
       next_item = stream.next_item.last
       next_item == [:done] ? Nothing : next_item.last
     } * to_stream,
-    
-    zip_with: ->(fn) {
-      ->(left_stream) {
-        ->(right_stream) {
-          next_fn = ->(state) {
-            val_so_far = state.first
-            l_stream = state[1]
-            r_stream = state[2]
-            next_stream = l_stream if val_so_far.empty?
-            next_stream = r_stream if val_so_far.length == 1
-            next_item = next_stream.next_item
-            if val_so_far.empty?
-              l_stream = next_item.last == :done ? empty : next_item.last
-            elsif val_so_far.length == 1
-              r_stream = next_item.last == :done ? empty : next_item.last
-            end
-            tag = next_item.first
-            val = next_item[1] == :done ? nil : next_item[1]
-            if tag == :done && l_stream == empty && r_stream == empty
-              [:done]
-            elsif tag == :skip
-              [:skip, Stream.new(next_fn, [val_so_far, l_stream, r_stream])]
-            elsif tag == :yield && val_so_far.length == 1
-              [:yield, fn.(*(val_so_far + [val])), Stream.new(next_fn, [[], l_stream, r_stream])]
-            elsif tag == :yield
-              [:skip, Stream.new(next_fn, [val_so_far + [val], l_stream, r_stream])]
-            else
-              raise "#{next_item} is a malformed stream response!"
-            end
-          }
-    
-        Stream.new(next_fn, [[], left_stream, right_stream])
-        } * to_stream
-      } * to_stream
-    },
 
     take: ->(n) {
       raise("#{n} must be a positive number") if n < 0
@@ -347,6 +334,41 @@ class F
             end
         } * stream.next_item_function
         Stream.new(next_fn, [n, stream])
+      } * to_stream
+    },
+
+    zip_with: ->(fn) {
+      ->(left_stream) {
+        ->(right_stream) {
+          next_fn = ->(state) {
+            val_so_far = state.first
+            l_stream = state[1]
+            r_stream = state[2]
+            next_stream = l_stream if val_so_far.empty?
+            next_stream = r_stream if val_so_far.length == 1
+            next_item = next_stream.next_item
+            if val_so_far.empty?
+              l_stream = next_item.last == :done ? empty : next_item.last
+            elsif val_so_far.length == 1
+              r_stream = next_item.last == :done ? empty : next_item.last
+            end
+            tag = next_item.first
+            val = next_item[1] == :done ? nil : next_item[1]
+            if tag == :done && l_stream == empty && r_stream == empty
+              [:done]
+            elsif tag == :skip
+              [:skip, Stream.new(next_fn, [val_so_far, l_stream, r_stream])]
+            elsif tag == :yield && val_so_far.length == 1
+              [:yield, fn.(*(val_so_far + [val])), Stream.new(next_fn, [[], l_stream, r_stream])]
+            elsif tag == :yield
+              [:skip, Stream.new(next_fn, [val_so_far + [val], l_stream, r_stream])]
+            else
+              raise "#{next_item} is a malformed stream response!"
+            end
+          }
+    
+        Stream.new(next_fn, [[], left_stream, right_stream])
+        } * to_stream
       } * to_stream
     },
 

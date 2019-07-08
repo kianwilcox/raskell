@@ -81,7 +81,17 @@ class Array
   
 end
 
+require 'set'
+
 class Set
+
+  def self.to_stream(set)
+    set.to_a.sort.to_stream
+  end
+
+  def to_stream
+    self.class.to_stream(self)
+  end 
 
   def push(item)
     self << item
@@ -93,8 +103,8 @@ end
 class Hash
 
   def <<(keyval)
-    raise("Can only push pairs into a dictionary") unless (pair.kind_of?(Array) || pair.kind_of?(Stream))
-    self[pair.first]=pair.last
+    raise("Can only push pairs into a dictionary") unless (keyval.kind_of?(Array) || keyval.kind_of?(Stream))
+    self[keyval.first]=keyval.last
     self
   end
 
@@ -105,7 +115,7 @@ class Hash
 
   def to_stream
     ## have to sort to ensure stream == works
-    self.to_a.sort {|x,y| x.first <=> y.first}.to_stream
+    self.class.to_stream(self)
   end
 
   def self.to_stream(xs)

@@ -28,6 +28,10 @@ class DoubleCheck
 			F.lte
 		when "lt"
 			F.lt
+		when "raises"
+			->(fn, str) { message = "no message"; raised = false; begin; fn.(); rescue Exception => e; raised = e.message.include?(str) ; !raised ? message = "Expected message to include #{str}, but it was #{e.message}" : nil;  end; !raised ? raise("expected to raise an exception with #{message} that contains #{str}") : raised }
+		when "raise"
+			->(fn, str) { message = "no message"; raised = false; begin; fn.(); rescue Exception => e; raised = e.message.include?(str) ; !raised ? message = "Expected message to include #{str}, but it was #{e.message}" : nil;  end; !raised ? raise("expected to raise an exception with #{message} that contains #{str}") : raised }
 		else
 			raise "#{op_name} is not supported by double_check. Please add this to the @@op_lookup function if you wish it to be supported"
 		end
