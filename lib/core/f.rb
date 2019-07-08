@@ -110,7 +110,7 @@ class F
 
   @@stage_0_5_defs={
     unfoldl: -> (next_fn, stop_fn, seed) { 
-      stream_next_fn = step.(next_fn, stop_fn)
+      stream_next_fn = ->x { x }
       Stream.new(stream_next_fn, seed)
     },
     transducer: ->(next_val_fn, next_state_fn, stop_fn) {
@@ -305,11 +305,11 @@ class F
       end
       next_item.first == :yield ? next_item[1] : Nothing
     } * to_stream,
-    rest: -> (stream) { 
+    rest: from_stream * -> (stream) { 
       next_item = stream.next_item.last
       next_item == [:done] ? Nothing : next_item.last
     } * to_stream,
-    init: ->(stream) { 
+    init: from_stream * ->(stream) { 
                        #### call it a step-transformer, or step-transducer, or just a step function or stepper
                        #### write a function that produces a function that processes a single next item
                        #### it should take a function for what to do when it's done, when it's skip, and when it's yield
@@ -330,7 +330,7 @@ class F
       Stream.new(next_fn, stream)
     } * to_stream,
     snoc: ->(el) {
-       ->(stream) { 
+       from_stream * ->(stream) { 
         next_fn = ->(s) {
           next_item = s.next_item
           if next_item == [:done]

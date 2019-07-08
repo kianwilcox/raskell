@@ -124,15 +124,20 @@ end
 
 
 class FromStream
-  def initialize(options={})
+  def initialize(clazz=Array, options={})
+    if clazz.kind_of?(Hash)
+      options = clazz
+      clazz = Array
+    end
     @before_function = options['before']
     @after_function = options['after']
+    @output_type = clazz
   end
 
   attr_accessor :before_function, :after_function
   singleton_class.send(:alias_method, :standard_new, :new)
-  def self.new(options={})
-    options['before'] && options['after'] ? ->(x) { self.standard_new(options).(x) } : self.standard_new(options)
+  def self.new(clazz=Array,options={})
+    options['before'] && options['after'] ? ->(x) { self.standard_new(clazz,options).(x) } : self.standard_new(clazz,options)
   end
 
   
@@ -154,7 +159,7 @@ class FromStream
 
 
   def unfold(stream)
-    result = []
+    result = @output_type.new
     # puts 'unfolding'
     # puts stream.inspect
     next_val = stream.next_item
@@ -252,7 +257,6 @@ class ToStream
   end
 
   
-
 
   alias_method :standard_kind_of?, :kind_of?
 

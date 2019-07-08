@@ -2,6 +2,10 @@
 
 class Array
 
+  def empty
+    []
+  end
+
   def fmap(fn)
     map {|x| fn.(x) }
   end
@@ -75,4 +79,49 @@ class Array
     obj.kind_of?(Stream) ? self.to_stream === obj : standard_triple_equals(obj)
   end
   
+end
+
+class Object
+  def self.empty
+    Self.new
+  end
+end
+
+class Set
+  def self.empty
+    self.new
+  end
+end
+
+class Hash
+
+  def self.empty
+    {}
+  end
+
+  def push(pair)
+    raise("Can only push pairs into a dictionary") unless (pair.kind_of?(Array) || pair.kind_of?(Stream))
+    self[pair.first]=pair.last
+  end
+
+  def to_stream
+    ## have to sort to ensure stream == works
+    self.to_a.sort {|x,y| x.first <=> y.first}.to_stream
+  end
+
+  def self.to_stream(xs)
+    ## have to sort to ensure steream == works
+    xs.to_a.sort {|x,y| x.first <=> y.first}.to_stream
+  end
+
+  alias_method :standard_equals, :==
+  def ==(obj)
+    obj.kind_of?(Stream) ? self.sort.to_stream == obj : standard_equals(obj)
+  end
+
+  alias_method :standard_triple_equals, :===
+  def ===(obj)
+    obj.kind_of?(Stream) ? self.to_stream === obj : standard_triple_equals(obj)
+  end
+
 end
