@@ -798,8 +798,8 @@ tests = [
   ["take_until.(fn) takes items from a stream until the function matches, then discards the remainder",
 
     ->() { 
-      f = F.take_until.(F.lt.(2))
-      check.("equal", f.([2,3,4]), [1,2])
+      f = F.take_until.(F.lt.(5))
+      check.("equal", f.([1,2,3,4,5,6,7]), [1,2,3,4,5])
       check.("equal", f.([2,3,4]).class, Stream)
       #check.("raises", -> { f.(F.empty) }, "foobar")
       
@@ -810,8 +810,8 @@ tests = [
   ["drop_until.(n) drops items from a stream until the function matches, then returns the remainder",
 
     ->() { 
-      f = F.drop_until.(F.lt.(2))
-      check.("equal", f.([2,3,4]), [3,4])
+      f = F.drop_until.(F.lt.(5))
+      check.("equal", f.([2,3,4,5,6,7,8]), [6,7,8])
       check.("equal", f.([2,3,4]).class, Stream)
       #check.("raises", -> { f.(F.empty) }, "foobar")
       
@@ -1187,7 +1187,7 @@ tests = [
 
     ->() { 
       f = F.slice_by.(F.gt.(3), F.lt.(4))
-      check.("equal", f.([4,4,4,4,5,2,1,2,4,5,8,3,4].to_stream), [2,1,2,4,5])
+      check.("equal", f.([4,4,4,4,5,2,1,2,4,5,8,3,4]), [2,1,2,4])
       check.("equal", f.([2,3,4]).class, Stream)
       
     }

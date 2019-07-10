@@ -218,25 +218,24 @@ class F
     },
 
     init: ->(stream) { 
-                       #### call it a step-transformer, or step-transducer, or just a step function or stepper
-                       #### write a function that produces a function that processes a single next item
-                       #### it should take a function for what to do when it's done, when it's skip, and when it's yield
-                       #### and those functions should yield 'step's in a stream
-      next_fn = ->(stream) {
-        next_item = stream.next_item
-        if next_item == [:done]
+      next_fn = ->(state) {
+        strm = state.last
+        next_item = strm.next_item
+        if next_item == [:done] && state.first == Nothing
           raise "init requires a stream length of at least 1"
-        elsif next_item.first == :skip 
-          [:skip, Stream.new(next_fn, next_item.last)]
-        elsif next_item.first == :yield && next_fn.(next_item.last) == [:done]
+        elsif next_item == [:done]
           [:done]
+        elsif next_item.first == :skip 
+          [:skip, Stream.new(next_fn, [state.first, next_item.last])]
+        elsif next_item.first == :yield && state.first == Nothing
+          [:skip, Stream.new(next_fn, [next_item[1], next_item.last])]
         elsif next_item.first == :yield
-          [:yield, next_item[1], Stream.new(next_fn, next_item.last)]
+          [:yield, state.first, Stream.new(next_fn, [next_item[1], next_item.last])]
         else
           raise "#{next_item} is a malformed stream response"
         end
       }
-      Stream.new(next_fn, stream)
+      Stream.new(next_fn, [Nothing, stream])
     } * to_stream,
 
     take_while: ->(fn) {
@@ -274,7 +273,7 @@ class F
             elsif tag == :skip || (tag == :yield && fn.(val))
               [:skip, Stream.new(next_fn, next_strm)]
             elsif tag == :yield
-              [:skip, next_strm]
+              [:yield, val, next_strm]
             else
               raise("#{next_item} is a malformed stream response!")
             end
@@ -284,30 +283,32 @@ class F
     }, 
 
     take_until: ->(fn) {
-      raise("take_until requires a function") unless fn.kind_of?(Proc)
+      raise("take_while requires a function") unless fn.kind_of?(Proc)
       ->(stream) {
         next_fn = ->(state) {
+            next_item = state.next_item
             tag = next_item.first
             val = next_item[1]
-            next_strm = next_item.last
+            next_stream = next_item.last
             if tag == :done || (tag == :yield && fn.(val))
               [:done]
             elsif tag == :skip
-              [:skip, Stream.new(next_fn, next_strm)]
+              [:skip, Stream.new(next_fn, next_stream)]
             elsif tag == :yield
-              [:yield, val, Stream.new(next_fn, next_strm)]
+              [:yield, val, Stream.new(next_fn, next_stream)]
             else
-              raise "#{next_item} is a malformed stream response!"
+              raise("#{next_item} is a malformed stream response!")
             end
-        } * stream.next_item_function
+        }
         Stream.new(next_fn, stream)
       } * to_stream
     }, 
 
     drop_until: ->(fn) {
-      raise("drop_until requires a function") unless fn.kind_of?(Proc)
+      raise("drop_while requires a function") unless fn.kind_of?(Proc)
       ->(stream) {
-        next_fn = ->(next_item) {
+        next_fn = ->(state) {
+            next_item = state.next_item
             tag = next_item.first
             val = next_item[1]
             next_strm = next_item.last
@@ -316,14 +317,14 @@ class F
             elsif tag == :skip || (tag == :yield && !fn.(val))
               [:skip, Stream.new(next_fn, next_strm)]
             elsif tag == :yield
-              [:skip, next_strm]
+              [:yield, val, next_strm]
             else
-              raise "#{next_item} is a malformed stream response!"
+              raise("#{next_item} is a malformed stream response!")
             end
-        } * stream.next_item_function
+        }
         Stream.new(next_fn, stream)
       } * to_stream
-    },
+    }, 
 
     zip_with: ->(fn) {
       ->(left_stream) {
@@ -631,7 +632,7 @@ class F
     reverse: foldl.(->(acc, el) { cons.(el, acc) }, []), ## or foldr.(->(el,acc) { snoc.(acc, el) }, [])
     length: foldl.(inc, 0),
     concat: flatmap.(to_stream),
-    enconcat: ->(left_stream) { append * cons },
+    enconcat: ->(left_stream, el) { append.(left_stream) * cons.(el) },
     all?: ->(f) { foldl.(->(acc, el) { f.(el) && acc }, true) }, ## this is going to become equal.(Nothing) * first * find_where.(F.not.(f))
     any?: ->(f) { foldl.(->(acc, el) { acc || f.(el) }, false) },
     replace: ->(to_replace, to_replace_with) {map.(->(x) { x == to_replace ? to_replace_with : x })},
