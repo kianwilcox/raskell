@@ -2,14 +2,12 @@ require 'singleton'
 
 class F
   # stream combinators
-  def self.to_stream(*args)
-    if args.length > 0
-      ToStream.new().(*args)
-    else
-      ToStream.new()
-    end
-  end
+  @@to_stream = ->(xs) { xs.to_stream }
   
+  def self.to_stream
+    @@to_stream
+  end
+
   def self.from_stream(*args)
     if args.length > 0
       FromStream.new().(*args)
@@ -38,17 +36,23 @@ class F
     self.to_hash
   end
 
+  
+
+
   include Singleton
 
   @@stage_0_defs = {
+
+    
 
     infinity: Float::INFINITY,
     negative_infinity: -Float::INFINITY, 
     inf: Float::INFINITY,
     ninf: -Float::INFINITY,
     id: Identity.new, # ->(x) { x }
-    apply: ->(f, x) { f.(x) },
+    apply: ->(f, *xs) { f.(*xs) },
     apply_with: ->(x,f) { f.(x) }, # flip * apply
+    compose: ->(f,g) { f * g },
     flip: -> (f,x,y) { f.(y,x) },
     slf: -> (f, x) { f.(x,x) }, ## square = slf * times
     fix: ->(f, x) { 
@@ -62,7 +66,7 @@ class F
     },   
     ## next_stream_fn yields Nothing for stop, and the next stream to go to otherwise
     ## yield_fn yields a Nothing for skip, and the next value to yield otherwise
-    step: ->(next_stream_fn, yield_fn) {
+    cstep: ->(next_stream_fn, yield_fn) {
       ## next_stream_fn :: state -> next_fn -> Maybe(stream)
       ## yield_fn :: state -> Maybe(item)
       next_fn = ->(state) {
@@ -78,7 +82,7 @@ class F
       }
       next_fn
     },
-    simple_step: ->(transition_fn, yield_fn) {
+    step: ->(transition_fn, yield_fn) {
       ## transition_fn :: state -> Maybe(state)
       ## yield_fn :: state -> Maybe(item)
       next_fn = ->(state) {
@@ -147,61 +151,42 @@ class F
     } * to_stream,
 
     rest: -> (stream) { 
-      next_item = stream.next_item.last
+      next_item = stream.next_item
       next_item == [:done] ? Nothing : next_item.last
     } * to_stream,
 
     take: ->(n) {
       raise("#{n} must be a positive number") if n < 0
       ->(stream) {
-        next_fn = ->(state) {
-          countdown = state.first
-          strm = state.last
-          if countdown == 0
-            [:done]
-          else
-            next_item = strm.next_item
-            tag = next_item.first
-            val = next_item[1]
-            next_strm = next_item.last
-            if tag == :done
-              [:done]
-            elsif tag == :skip
-              [:skip, [countdown, next_strm]]
-            elsif tag == :yield
-              [:yield, val, [countdown-1, next_strm]]
+        next_fn = step.(->(state){
+            if state.first == 0
+              Nothing
             else
-              raise "#{next_item} is a malformed stream response!"
+              next_item = state.last.next_item
+              count = next_item.first == :skip ? state.first : state.first-1
+              next_item == [:done] ? Nothing : [count, next_item.last]
             end
-          end
-        }
+          },
+          ->(state) { 
+            next_item = state.last.next_item
+            next_item.first == :yield ? next_item[1] : Nothing
+          })
         Stream.new(next_fn, [n, stream])
       } * to_stream
     }, 
     drop: ->(n) {
       raise("#{n} must be a positive number") if n < 0
       ->(stream) {
-        next_fn = ->(state) {
-          countdown = state.first
-          strm = state.last
-          if countdown == 0
-            [:skip, strm]
-          else
-            next_item = strm.next_item
-            tag = next_item.first
-            val = next_item[1]
-            next_strm = next_item.last
-            if tag == :done
-              [:done]
-            elsif tag == :skip
-              [:skip, [countdown, next_strm]]
-            elsif tag == :yield
-              [:skip, [countdown-1, next_strm]]
-            else
-              raise "#{next_item} is a malformed stream response!"
-            end
-          end
-        }
+        next_fn = step.(->(state){
+            next_item = state.last.next_item
+            count = next_item.first == :skip || state.first == 0 ? state.first : state.first-1
+            next_item == [:done] ? Nothing : [count, next_item.last]
+          },
+          ->(state) { 
+            count = state.first
+            next_item = state.last.next_item
+            next_item.first == :yield && count == 0 ? next_item[1] : Nothing
+          })
         Stream.new(next_fn, [n, stream])
       } * to_stream
     }, 
@@ -220,9 +205,9 @@ class F
             if tag == :done
               [:done]
             elsif tag == :skip
-              [:skip, [countdown, next_strm]]
+              [:skip, next_strm]
             elsif tag == :yield
-              [:skip, [countdown-1, next_strm]]
+              [:skip, next_strm]
             else
               raise "#{next_item} is a malformed stream response!"
             end
@@ -237,7 +222,8 @@ class F
                        #### write a function that produces a function that processes a single next item
                        #### it should take a function for what to do when it's done, when it's skip, and when it's yield
                        #### and those functions should yield 'step's in a stream
-      next_fn = ->(next_item) {
+      next_fn = ->(stream) {
+        next_item = stream.next_item
         if next_item == [:done]
           raise "init requires a stream length of at least 1"
         elsif next_item.first == :skip 
@@ -249,7 +235,7 @@ class F
         else
           raise "#{next_item} is a malformed stream response"
         end
-      } * s.next_item_function
+      }
       Stream.new(next_fn, stream)
     } * to_stream,
 
@@ -257,6 +243,7 @@ class F
       raise("take_while requires a function") unless fn.kind_of?(Proc)
       ->(stream) {
         next_fn = ->(state) {
+            next_item = state.next_item
             tag = next_item.first
             val = next_item[1]
             next_stream = next_item.last
@@ -269,15 +256,16 @@ class F
             else
               raise("#{next_item} is a malformed stream response!")
             end
-        } * stream.next_item_function
-        Stream.new(next_fn, [n, stream])
+        }
+        Stream.new(next_fn, stream)
       } * to_stream
     }, 
 
     drop_while: ->(fn) {
       raise("drop_while requires a function") unless fn.kind_of?(Proc)
       ->(stream) {
-        next_fn = ->(next_item) {
+        next_fn = ->(state) {
+            next_item = state.next_item
             tag = next_item.first
             val = next_item[1]
             next_strm = next_item.last
@@ -290,8 +278,8 @@ class F
             else
               raise("#{next_item} is a malformed stream response!")
             end
-        } * stream.next_item_function
-        Stream.new(next_fn, [n, stream])
+        }
+        Stream.new(next_fn, stream)
       } * to_stream
     }, 
 
@@ -312,7 +300,7 @@ class F
               raise "#{next_item} is a malformed stream response!"
             end
         } * stream.next_item_function
-        Stream.new(next_fn, [n, stream])
+        Stream.new(next_fn, stream)
       } * to_stream
     }, 
 
@@ -333,7 +321,7 @@ class F
               raise "#{next_item} is a malformed stream response!"
             end
         } * stream.next_item_function
-        Stream.new(next_fn, [n, stream])
+        Stream.new(next_fn, stream)
       } * to_stream
     },
 
@@ -380,6 +368,9 @@ class F
 
 
   @@stage_0_5_defs={
+    double: slf.(plus),
+    square: slf.(times),
+
     snoc: ->(el) {
 
        ->(stream) { 
@@ -590,6 +581,21 @@ class F
       } * to_stream
       
     } * to_stream,
+    initial: ->(stream) {
+      next_fn = ->(strm) {
+        next_item = strm.next_item
+        if next_item.first == :done
+          raise "Must have at least one item inside of the stream!"
+        elsif next_item.first == :yield
+          [:yield, next_item[1], empty]
+        elsif next_item.first == :skip
+          [:skip, next_item.last]
+        else
+          raise("#{next_item} is a malformed stream response!")
+        end
+      }
+      Stream.new(next_fn, stream)
+      },
     final: -> (stream) { 
       next_fn = ->(state) {
         prev_step = state.first
@@ -618,27 +624,20 @@ class F
   @@stage_1_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 
   @@stage_2_defs = {
-    double: slf.(plus),
-    square: slf.(times),
-
     ## stream functions
     last: first * final,
     uncons: ->(s) { append(first.(l), wrap(rest.(l)))  } * to_stream,
     unsnoc: ->(s) { append(wrap(init.(s)), last.(s)) } * to_stream,
     reverse: foldl.(->(acc, el) { cons.(el, acc) }, []), ## or foldr.(->(el,acc) { snoc.(acc, el) }, [])
     length: foldl.(inc, 0),
-    concat: flatmap.(id),
-    enconcat: ->(left_stream, item, right_stream) {
-      append.(left_stream, cons.(item, right_stream))
-    },
-    all?: ->(f) { foldl(->(acc, el) { f.(el) && acc }, true) },
-    any?: ->(f) { foldl(->(acc, el) { acc || f.(el) }, false) },
+    concat: flatmap.(to_stream),
+    enconcat: ->(left_stream) { append * cons },
+    all?: ->(f) { foldl.(->(acc, el) { f.(el) && acc }, true) }, ## this is going to become equal.(Nothing) * first * find_where.(F.not.(f))
+    any?: ->(f) { foldl.(->(acc, el) { acc || f.(el) }, false) },
     replace: ->(to_replace, to_replace_with) {map.(->(x) { x == to_replace ? to_replace_with : x })},
     replace_with: ->(to_replace_with, to_replace) { map.(->(x) { x == to_replace ? to_replace_with : x }) },
-    find_where: ->(fn) {
-      first * filter.(fn)
-    },
-    transpose: ->(stream_of_streams) { zip.( *(stream_of_streams.to_a) ) },
+    find_where: ->(fn){ first * filter.(fn) },
+    transpose: ->(stream_of_streams) { zip.( *(stream_of_streams) ) },
   
     # stream folds useful for containers of booleans
     ands: foldl.(self.and, true),
@@ -646,17 +645,17 @@ class F
 
     # stream folds useful for containers of numbers (core statistics algorithms)
     
-    maximum: foldl.(max, infinity),
-    minimum: foldl.(min, negative_infinity),
-    maximum_by: ->(fn) { foldl.(->(max_so_far, el) { fn.(el) > fn.(max_so_far) ? el : max_so_far}, negative_infinity) },
-    minimum_by:  ->(fn) { foldl.(->(min_so_far, el) { fn.(el) < fn.(min_so_far) ? el : min_so_far}, infinity) },
+    maximum: foldl.(max, negative_infinity),
+    minimum: foldl.(min, infinity),
+    maximum_by: ->(fn) { foldl.(->(max_so_far, el) { max_so_far == Nothing || fn.(el) > fn.(max_so_far) ? el : max_so_far}, Nothing) },
+    minimum_by:  ->(fn) { foldl.(->(min_so_far, el) { min_so_far == Nothing || fn.(el) < fn.(min_so_far) ? el : min_so_far}, Nothing) },
 
     sum: foldl.(plus, 0),
     product: foldl.(times, 1),
-    mean: ->(l) { div_from(*( (sum + length).(l) )) }, ## this works because (sum + length).(l)== [sum.(l), length.(l)]
+    mean: ->(l) { div_from(*( [sum,length].(l) )) }, ## this works because (sum + length).(l)== [sum.(l), length.(l)]
     sum_of_squares: foldl.(plus, 0) * map.(slf.(times)),
     ## this is a two-pass algorithm
-    sum_of_differences_from_mean_two_pass: ->(mean) { foldl.(plus, 0) * map.(sub_by.(mean)) } * ->(l) { div_from(*( (sum + length).(l) )) }
+    sum_of_differences_from_mean_two_pass: ->(mean) { foldl.(plus, 0) * map.(square * sub_by.(mean)) } * ->(l) { div_from(*( (sum + length).(l) )) }
     ## this is a one-pass algorithm, but only an estimate
     #sum_of_squares_of_differences_from_mean_iterative
     ## - need length, sum, sum_of_squares, M1,M2,M3, deltas, etc... see https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
@@ -670,17 +669,24 @@ class F
   @@stage_2_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 
   @@stage_3_defs = {
-    contains?: ->(el) { Nothing != find_where.(equals.(el)) },
-    does_not_contain?: ->(el) { Nothing == find_where.(equals.(el)) },
+    contains?: ->(el) { F.not * F.equal.(Nothing) * find_where.(equals.(el)) },
+    does_not_contain?: ->(el) { F.equal.(Nothing) * find_where.(equals.(el)) },
 
     ## stream functionals
     #init: take_except.(1),
-    fold: final * scanl,
-    slice_by: ->(starts_with_fn, ends_with_fn) { take_until.(ends_with_fn) * drop_until.(starts_with_fn) * to_stream },
-    interleave: concat * transpose,
+    fold: ->(fn, u) { final * scanl.(fn, u) },
+    slice_by: ->(starts_with_fn, ends_with_fn) { take_until.(ends_with_fn) * drop_until.(starts_with_fn) },
+    interleave: ->(xs, ys) { concat * transpose.(xs).(ys) }, ## remove the xs ys when I fix zip_with to work with *args and return a lambda expecting another if it only gets one stream to zip
     
   }
+
   @@stage_3_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
+
+  @@stage_4_defs = {
+
+  }
+
+  @@stage_4_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 end
   #std
 

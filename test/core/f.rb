@@ -1,155 +1,3 @@
-=begin The below is the surface
-
-nd = ->(x,y) { x && y }
-nnd = ->(x,y) { !(x && y) }
-r = ->(x,y) { x || y }
-xr = ->(x,y) { !(x && y) && (x || y) }
-
-nt = ->(x) { !x }
-
-
-
-first = -> (l) { l[0] }
-last = -> (l) { l[-1] }
-rest = -> (l) { l[1..-1] }
-init = ->(l) { l[0..-2] }
-
-cons = ->(el, l) { [el] + l }
-snoc = ->(l, el) { l + [el] }
-
-uncons = ->(l) { [first.(l), rest.(l)] }
-unsnoc = ->(l) { [init.(l), last.(l)]}
-
-foldl = ->(f, u) { Foldl.new([f,u]) }
-foldr = ->(f,u,l) { l.foldr(u) { |el, acc| f.(el, acc) } }
-
-unfoldl = -> (next_fn, stop_fn, seed) { 
-  intermediate_result = seed
-  while !stop_fn.(intermediate_result)
-    intermediate_result = next_fn.(intermediate_result)
-  end
-  intermediate_result
-}
-
-map = ->(f) { foldl.(->(acc,el) { acc.push(f.(el)) }, [])}
-
-sum = foldl.(plus, 0)
-product = foldl.(times, 1)
-reverse = foldl.(snoc, [])
-
-ands = foldl.(nd, true)
-ors = foldl.(r, false)
-all = ->(f) { foldl(->(acc, el) { f.(el) && acc }, true) }
-any = ->(f) { foldl(->(acc, el) { acc || f.(el) }, false) }
-maximum = foldl.(max, F.infinity)
-minimum = foldl.(min, F.negative_infinity)
-reverse = foldl.(->(acc, el) { cons.(el, acc) }, []) ## or foldr.(->(el,acc) { snoc.(acc, el) })
-filter = ->(f) { foldl.(->(acc,el) { f.(el) ? snoc.(acc,el) : acc }, []) }
-append = ->(l1, l2) { l1 + l2 } 
-flatmap = ->(f) { foldl.(->(acc, el) { plus.(acc, f.(el)) }, []) }
-concat = foldl.(plus, [])
-enconcat = ->(l, el, r) { l + [el] + r }
-
-replace = ->(toReplace, toReplaceWith) {map.(->(x) { x == toReplace ? toReplaceWith : x })}
-replaceWith = ->(toReplaceWith, toReplace) { map.(->(x) { x == toReplace ? toReplaceWith : x }) }
-replaceByIf = F.->(replace_fn, should_replace_fn) { map.( ->(x) { should_replace_fn.(x) ? replace_fn.(x) : x } ) }
-
-
-intercalate = #->(el) { init.(foldl.(, []))}
-intersperse
-
-intersection
-union
-difference
-cartesian_product
-
-zip_with 
-zip = zip_with.(id)
-unzip
-updated
-zipWithIndex
-
-last_index_of
-last_index_of_slice
-last_index_where
-
-first_index_of
-first_index_of_slice
-first_index_where
-
-partition_at
-partition_by
-split_by
-span
-
-transpose
-
-take
-drop
-takeWhile
-dropWhile
-takeUntil
-dropUntil
-
-drop_except/last_n
-mean
-variance
-std
-
-maximum_by
-minimum_by
-
-elem/member/find/contains
-subsequence/containsSlice
-endsWith
-startsWith
-
-notElem
-
-findBy
-
-index/nth
-indexOf
-first_index_of_slice
-indexWhere
-elemIndex
-findIndex
-random
-randomN
-
-segmentLength
-splice
-patch
-span
-
-grouped
-groupBy
-permutations
-combinations
-sliding/window
-sortBy ## insertionSort
-scanr
-scanl
-deepMap
-deepZip
-deepMerge
-
-quicksort
-mergesort
-
-deepMap
-deepZip
-deepMerge
-
-hylo # unfoldl . foldl
-meta # foldl . unfoldl
-
-=end
-
-
-##TODO: A bunch - just check the original generics and make sure each function is tested in here in the order it appears there
-
-
 tests = [
 
 
@@ -850,7 +698,7 @@ tests = [
     ->() { 
       f = F.first
       check.("equal", f.([2,3,4].to_stream), 2)
-      check.("raises", -> { f.(F.empty) }, "first")
+      check.("equal", f.(F.empty), Nothing)
       
     }
 
@@ -862,13 +710,490 @@ tests = [
       f = F.rest
       check.("equal", f.([2,3,4].to_stream), [3,4])
       check.("equal", f.([2,3,4].to_stream).class, Stream)
+      check.("equal", f.(F.empty), Nothing)
+      
+    }
+
+  ],
+
+
+  ["take.(n) takes n items from a stream. If there are less than n items, it returns the stream",
+
+    ->() { 
+      f = F.take.(3)
+      s1 = [1,2].to_stream
+      s2 = [1,2,3,4].to_stream
+      check.("equal", f.(s1), [1,2])
+      check.("equal", f.(s2), [1,2,3])
+      check.("equal", f.(s1).class, Stream)
+      
+    }
+
+  ],
+
+  ["drop.(n) drops n items from a stream. If there are less than n items, it returns the empty stream",
+
+    ->() { 
+      f = F.drop.(3)
+      s1 = [1,2].to_stream
+      s2 = [1,2,3,4].to_stream
+      check.("equal", f.(s1), [])
+      check.("equal", f.(s2), [4])
+      check.("equal", f.(s1).class, Stream)
+      
+    }
+
+  ],
+=begin
+  ["take_except.(n) takes all but the last n items from a stream. If there are less than n items, it returns the empty stream",
+
+    ->() { 
+      f = F.rest
+      check.("equal", f.([2,3,4].to_stream), [3,4])
+      check.("equal", f.([2,3,4].to_stream).class, Stream)
+      check.("raises", -> { f.(F.empty) }, "foobar")
+      
+    }
+
+  ],
+=end
+
+  ["drop_except.(n) drops all but n items from a stream. If there are less than n items, it returns the stream",
+
+    ->() { 
+      f = F.drop_except.(2)
+      check.("equal", f.([2,3,4]), [3,4])
+      check.("equal", f.([2,3,4]).class, Stream)
+      check.("equal", f.([4].to_stream), [4])
+      #check.("equal", f.([1,2]), "foobar")
+      
+    }
+
+  ],
+
+  ["take_while.(fn) takes items from a stream while the function matches, then discards the remainder",
+
+    ->() { 
+      f = F.take_while.(F.gt.(3))
+      check.("equal", f.([1,2,3,4]), [1,2])
+      check.("equal", f.([1,2,3,4]).class, Stream)
+      #check.("raises", -> { f.(F.empty) }, "foobar")
+      
+    }
+
+  ],
+
+  ["drop_while.(n) drops items from a stream while the function matches, then returns the remainder",
+
+    ->() { 
+      f = F.drop_while.(F.lt.(3))
+      check.("equal", f.([5,4,3,2,1]), [3,2,1])
+      check.("equal", f.([1,2,3,4]).class, Stream)
+      #check.("raises", -> { f.(F.empty) }, "foobar")
+      
+    }
+
+  ],
+
+  ["take_until.(fn) takes items from a stream until the function matches, then discards the remainder",
+
+    ->() { 
+      f = F.take_until.(F.lt.(2))
+      check.("equal", f.([2,3,4]), [1,2])
+      check.("equal", f.([2,3,4]).class, Stream)
+      #check.("raises", -> { f.(F.empty) }, "foobar")
+      
+    }
+
+  ],
+
+  ["drop_until.(n) drops items from a stream until the function matches, then returns the remainder",
+
+    ->() { 
+      f = F.drop_until.(F.lt.(2))
+      check.("equal", f.([2,3,4]), [3,4])
+      check.("equal", f.([2,3,4]).class, Stream)
+      #check.("raises", -> { f.(F.empty) }, "foobar")
+      
+    }
+
+  ],
+
+  ["init returns all but the last element of the stream",
+
+    ->() { 
+      f = F.init
+      check.("equal", f.([2,3,4]), [2,3])
+      check.("equal", f.([2,3,4]).class, Stream)
+      #check.("raises", -> { f.(F.empty) }, "foobar")
+      
+    }
+
+  ],
+
+  ["zip_with.(fn) zips n streams together and then applies a function to each zipped set. i.e., zip = zip_with(list), zip_with.(fn) = map(apply.(fn)) * zip, zip_with(plus) adds elements, etc",
+
+    ->() { 
+      f = F.zip_with.(F.list)
+      g = F.zip_with.(F.plus)
+      
+      
+      check.("equal", f.([2,3,4]).([4,5,6]), [[2,4], [3,5], [4,6]])
+      check.("equal", g.([2,3,4]).([4,5,6]), [6, 8, 10])
+      check.("equal", f.([2,3,4]).([4,5,6]).class, Stream)
+      check.("equal", f.([2,3,4]).([4,5,6],[7,8,9]), [[2,4,7], [3,5,8], [4,6,9]])
+      #check.("raises", -> { f.(F.empty) }, "foobar")
+      
+    }
+
+  ],
+
+  ["list takes any number of arguments and returns all of them listed together in order",
+
+    ->() { 
+      f = F.list
+      check.("equal", f.(1,2,3), [1,2,3])
+      check.("equal", f.(1,2,3).class, Array)
+      #check.("raises", -> { f.(F.empty) }, "foobar")
+      
+    }
+
+  ],
+
+  ["double(3) == 6, double(-3) == -6",
+
+    ->() { 
+      f = F.double
+      check.("equal", f.(3), 6)
+      
+    }
+
+  ],
+
+  ["square(3) == 9, square(-3) == 9",
+
+    ->() { 
+      f = F.square
+      check.("equal", f.(3), 9)
+      
+    }
+
+  ],
+
+  ["snoc adds an element to the end of a stream",
+
+    ->() { 
+      f = F.snoc
+      check.("equal", f.(5,[2,3,4]), [2,3,4,5])
+      check.("equal", f.(5,[2,3,4]).class, Stream)
+      
+    }
+
+  ],
+
+  ["final takes a stream and returns a stream with only the last element",
+
+    ->() { 
+      f = F.final
+      check.("equal", f.([2,3,4]), [4])
+      check.("equal", f.([2,3,4]).class, Stream)
+      
+    }
+
+  ],
+
+  ["last takes the last element in a stream, or raises an error if the stream is empty",
+
+    ->() { 
+      f = F.last
+      check.("equal", f.([2,3,4].to_stream), 4)
+      check.("raises", -> { f.(F.empty) }, "Must have at least one item")
+      
+    }
+
+  ],
+=begin
+  ["uncons",
+
+    ->() { 
+      f = F.rest
+      check.("equal", f.([2,3,4].to_stream), [3,4])
+      check.("equal", f.([2,3,4].to_stream).class, Stream)
       check.("raises", -> { f.(F.empty) }, "foobar")
       
     }
 
   ],
 
-  ## TODO NEXT: takes, drops, zip_with
+  ["unsnoc",
+
+    ->() { 
+      f = F.rest
+      check.("equal", f.([2,3,4].to_stream), [3,4])
+      check.("equal", f.([2,3,4].to_stream).class, Stream)
+      check.("raises", -> { f.(F.empty) }, "foobar")
+      
+    }
+
+  ],
+=end
+  ["reverse",
+
+    ->() { 
+      f = F.reverse
+      check.("equal", f.([2,3,4]), [4,3,2])
+      check.("equal", f.([2,3,4]).class, Stream)
+      
+    }
+
+  ],
+
+  ["length",
+
+    ->() { 
+      f = F.length
+      check.("equal", f.([2,3,4].to_stream), 3)
+      
+    }
+
+  ],
+
+  ["concat",
+
+    ->() { 
+      f = F.concat
+      check.("equal", f.([[2,3,4], [2,3,4], [2,3,4]]), [2,3,4,2,3,4,2,3,4])
+      check.("equal", f.([[2,3,4], [2,3,4], [2,3,4]]).class, Stream)
+      
+    }
+
+  ],
+
+  ["enconcat adds an item between two other streams",
+
+    ->() { 
+      f = F.enconcat
+      check.("equal", f.([2,3,4], 5, [6,7]), [2,3,4,5,6,7])
+      check.("equal", f.([2,3,4].to_stream).class, Stream)
+      
+    }
+
+  ],
+
+  ["all? checks if every element in the stream satisfies a relation. It should short-circuit",
+
+    ->() { 
+      f = F.all?.(F.gt.(3))
+      check.("equal", f.([1,1,1,1]), true)
+      check.("equal", f.([1,1,3,1]), false)
+      
+    }
+
+  ],
+
+  ["any? checks if any element in the stream satisfies a relation. It should short-circuit",
+
+    ->() { 
+      f = F.any?.(F.gt.(3))
+      check.("equal", f.([3,1,3,3]), true)
+      check.("equal", f.([3,3,3,3]), false)
+      
+    }
+
+  ],
+
+  ["replace.(x,y) replaces every element that == x with y",
+
+    ->() { 
+      f = F.replace.(1,2)
+      check.("equal", f.([1,2,3,4,1]), [2,2,3,4,2])
+      check.("equal", f.([2,3,4].to_stream).class, Stream)
+      
+    }
+
+  ],
+
+  
+  ["replace_with takes an element, and an element to replace,and replaces them",
+
+    ->() { 
+      f = F.replace_with.(3,4)
+      check.("equal", f.([1,2,4,4,1]), [1,2,3,3,1])
+      check.("equal", f.([2,3,4].to_stream).class, Stream)
+      
+    }
+
+  ],
+  
+  ["find_where returns the first item in the stream matching a function ",
+
+    ->() { 
+      f = F.find_where.(F.lt.(1))
+      check.("equal", f.([1,2,4,4,1]), 2)
+      check.("equal", f.([-1,-2,-4,-4,-1]), Nothing)
+      
+    }
+
+  ],
+
+  ["transpose is just a multidimensional zip. Also, transpose^n, where n is the depth of list nesting, is equivalent to identity",
+
+    ->() { 
+      f = F.transpose
+      check.("equal", f.([[1,1,1], [2,2,2]]), [[1,2], [1,2], [1,2]])
+      check.("equal", f.(f.([[1,1,1], [2,2,2]])), [[1,1,1], [2,2,2]])
+      check.("equal", f.([[1,1,1], [2,2,2]]).class, Stream)
+      
+    }
+
+  ],
+
+  ["ands returns true if all booleans in a stream are true. short-circuits",
+
+    ->() { 
+      f = F.ands
+      check.("equal", f.([true,false,true]), false)
+      check.("equal", f.([true,true,true]), true)
+      
+    }
+
+  ],
+
+  ["ors returns true if any booleans in a stream are true. short-circuits",
+
+    ->() { 
+      f = F.ors
+      check.("equal", f.([true,false,true]), true)
+      check.("equal", f.([false,false,false]), false)
+      
+    }
+
+  ],
+
+  ["maximum returns the largest element in a stream",
+
+    ->() { 
+      f = F.maximum
+      check.("equal", f.([2,4,3]), 4)
+      
+    }
+
+  ],
+
+  ["minimum returns the smallest element in a stream",
+
+    ->() { 
+      f = F.minimum
+      check.("equal", f.([4,2,3]), 2)
+      
+    }
+
+  ],
+
+  ["maximum_by returns the largest element in a stream according to the function passed in",
+
+    ->() { 
+      f = F.maximum_by.(F.square)
+      check.("equal", f.([2,-4,3]), -4)
+      
+    }
+
+  ],
+
+  ["minimum_by returns the smallest element in a stream according to the function passed in",
+
+    ->() { 
+      f = F.minimum_by.(->x { - x })
+      check.("equal", f.([2,4,3]), 4)
+      
+    }
+
+  ],
+
+  ["sum adds all the elements in a stream",
+
+    ->() { 
+      f = F.sum
+      check.("equal", f.([2,3,4]), 9)
+      
+    }
+
+  ],
+
+  ["product multiplies all the elements in a stream",
+
+    ->() { 
+      f = F.product
+      check.("equal", f.([2,3,4]), 24)
+      
+    }
+
+  ],
+
+  ["sum_of_squares adds the square of all the elements in a stream",
+
+    ->() { 
+      f = F.sum_of_squares
+      check.("equal", f.([2,3,4]), 29)
+      
+    }
+
+  ],
+
+  ["mean finds the mean value of a stream of numbers",
+
+    ->() { 
+      f = F.mean
+      check.("equal", f.([2,3,4]), 3)
+      
+    }
+
+  ],
+
+  ["contains? returns true if the stream contains an element",
+
+    ->() { 
+      f = F.contains?.(3)
+      check.("equal", f.([2,3,4]), true)
+      check.("equal", f.([2,4,4]), false)
+      
+    }
+
+  ],
+
+  ["does_not_contain? returns true if the stream does not contain an element",
+
+    ->() { 
+      f = F.does_not_contain?.(3)
+      check.("equal", f.([2,3,4]), false)
+      check.("equal", f.([2,4,4]), true)
+      
+    }
+
+  ],
+
+  ["fold is a stream-continuant version of foldl - it's just the final of scanl",
+
+    ->() { 
+      f = F.fold.(F.plus, 0)
+      check.("equal", f.([2,3,4]), [10])
+      check.("equal", f.([2,3,4]).class, Stream)
+      
+    }
+
+  ],
+
+  ["slice_by takes a function for starting a slice, and a function for stopping it, and then slices out a segment based on those functions",
+
+    ->() { 
+      f = F.slice_by.(F.gt.(3), F.lt.(4))
+      check.("equal", f.([4,4,4,4,5,2,1,2,4,5,8,3,4].to_stream), [2,1,2,4,5])
+      check.("equal", f.([2,3,4]).class, Stream)
+      
+    }
+
+  ],
+
 
   ["map takes a function and a stream and returns a new stream that applies this function to every element in the old stream",
 
@@ -1019,6 +1344,7 @@ tests = [
 
   ],
 =end
+
 
   
   ["foldl works over streams" ,

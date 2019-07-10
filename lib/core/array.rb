@@ -12,20 +12,7 @@ class Array
 
   def call(*args)
     #functions = self.map { |x| x.kind_of?(Proc) ? self : ->() { x } }
-    if !args || args.length == 0 || !self.any? { |x| x.kind_of?(Proc) }
-      self
-    else
-      unit = self.first.kind_of?(Proc) ? self.first : ->() { self.first }
-      function = self.drop(1).reduce(unit) do |new_fn, func| 
-        func_to_add = func.kind_of?(Proc) ? func : ->() { func }
-        new_fn + func_to_add
-      end
-      while args.length != 0
-        function = function.(args.first)
-        args = args.drop(1)
-      end
-      function
-    end
+      self.any? {|x| x.kind_of? Proc } ? fmap(->(f) { f.(*args)}) : self
   end
 
   def take(n)

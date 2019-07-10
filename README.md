@@ -1,7 +1,6 @@
 # raskell
 Making Ruby a Joy to Work With 
 =======
-Making Ruby a Joy to Work With 
 
 
 Usage:
@@ -16,7 +15,7 @@ Lambdas can be partially applied, yielding a new lambda, with call
 ```plus10 = plus.(10) ## or plus[10]```
 ```plus10.(20)``` evaluates as ```30```
 
-Lambda Composition with \* ( (f \* g \* h).() == )
+Lambda Composition with \* (right-associative) ```( (f \* g \* h).(x) == f.(g.(h.(x))))```
 ```times10 = ->(x) { x * 10 }```
 ```minus3 = ->(x) { x - 3 }```
 ```double = ->(x) { x * 2 }```
@@ -25,11 +24,11 @@ Lambda Composition with \* ( (f \* g \* h).() == )
 ```(double * minus3 * times10).(5)``` evaluates as ```94```
 
 
-Lambda Pipelining with \| (left-associative)
+Lambda Pipelining with \| (left-associative)  ```( (f \| g \| h).(x) == h.(g.(f.(x))) )```
 ```(times10 | minus3 | double).(5)``` evaluates as ```94```
 ```(double | minus3 | times10).(5)``` evaluates as ```70```
 
-Lambda Tupling with + (associative, directionality irrelevant)
+Lambda Tupling with + (associative)
 ```(times10 + minus3 + double).(5)``` evaluates as ```[50, 2, 10]```
 
 Objects, when called, act like constant functions that throw away any values applied to them
@@ -50,12 +49,12 @@ Preface any collection function with F. to call that particular function
 
 
 \*I) partial application for lambdas, treat [] as .call() for lambdas, and add .call(\*args) to objects (a no-op) and arrays (map across calling element.call(\*args) for each element)
-\*II) function tupling, composition, and pipelining in the form of +,\*, and |
-III) a standard collections library based around fusable stream transducers - (flat)map, filter, fold\*, zip, append, scanl - Scala/Haskell eqv.
-\*IV) a very lightweight testing framework, DoubleCheck, built using the above as a demo, along with tests for everything previously built
-V) add tupling for stream transducers as well, so that multiple transducers can run in parallel across the same stream in a single pass, w/ tests
-VI) add instances of from_stream(ClassName=Array) and to_stream for Dictionary, (Multi?)Set, Array, Range, Integer, and Object
-VII) Make everything that isn't a function a 'constant' function that implicitly pushes to an ArgumentStack once lifted, and then returns the ArgumentStack. Modify lambda calling to properly use argument stack if it is passed in.
+\*II) function tupling, composition, and pipelining in the form of +,\*, and \|
+\*III) a very lightweight testing framework, DoubleCheck, built using the above as a demo, along with tests for everything previously built
+\*IV) a standard collections library based around fusable stream transducers - (flat)map, filter, fold\*, zip, append, scanl - Scala/Haskell eqv.
+\*V) add instances of from_stream(ClassName=Array) and to_stream for Dictionary, (Multi?)Set, Array, Range, Integer, and Object
+VI) add tupling for foldl and stream transducers as well, so that multiple transducers can run in parallel across the same stream in a single pass, w/ tests
+VII) Make everything that isn't a function a 'constant' function that implicitly pushes to an ArgumentStack once lifted, and then returns the ArgumentStack. Modify lambda calling to properly use argument stack if it is passed in, and to place unused arguments onto after calling - forking lambdas - i.e. a [fn, fn2,fn3,fn4].(), duplicate argument stacks and create unique new ones in their locations, rather than 'sharing' a common argument stack - turning Raskell into a "Joy" to *work* with
 
 
 
@@ -75,7 +74,7 @@ Using in Raskell so far
 
 
 
-=~ and !~ will be good for later when I have 'regular expressions' over arbitrary asterated semirings
+=~ and !~ will be good for later when I have 'regular expressions' over arbitrary asterated semirings - then i can match if the data, path, whatever matches a regex of allowable types - and this gives us a powerful form of type constraint for very inexpensive
 
 
 
