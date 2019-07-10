@@ -327,38 +327,31 @@ class F
     }, 
 
     zip_with: ->(fn) {
-      ->(left_stream) {
-        ->(right_stream) {
+      ->(left_stream, right_stream, *streams) {
+          streams = ([left_stream, right_stream] + streams).map(&:to_stream)
           next_fn = ->(state) {
             val_so_far = state.first
-            l_stream = state[1]
-            r_stream = state[2]
-            next_stream = l_stream if val_so_far.empty?
-            next_stream = r_stream if val_so_far.length == 1
+            strms = state.drop(1)
+            next_stream = strms.first
             next_item = next_stream.next_item
-            if val_so_far.empty?
-              l_stream = next_item.last == :done ? empty : next_item.last
-            elsif val_so_far.length == 1
-              r_stream = next_item.last == :done ? empty : next_item.last
-            end
+            new_streams = strms.drop(1) + [next_stream.next_item.last == :done ? empty : next_item.last]
             tag = next_item.first
-            val = next_item[1] == :done ? nil : next_item[1]
-            if tag == :done && l_stream == empty && r_stream == empty
+            val = tag == :done ? nil : next_item[1]
+            if tag == :done
               [:done]
             elsif tag == :skip
-              [:skip, Stream.new(next_fn, [val_so_far, l_stream, r_stream])]
-            elsif tag == :yield && val_so_far.length == 1
-              [:yield, fn.(*(val_so_far + [val])), Stream.new(next_fn, [[], l_stream, r_stream])]
+              [:skip, Stream.new(next_fn, [val_so_far] +  new_streams)]
+            elsif tag == :yield && val_so_far.length == streams.length - 1
+              [:yield, fn.(*(val_so_far + [val])), Stream.new(next_fn, [[]] + new_streams)]
             elsif tag == :yield
-              [:skip, Stream.new(next_fn, [val_so_far + [val], l_stream, r_stream])]
+              [:skip, Stream.new(next_fn, [val_so_far + [val]] + new_streams)]
             else
               raise "#{next_item} is a malformed stream response!"
             end
           }
     
-        Stream.new(next_fn, [[], left_stream, right_stream])
-        } * to_stream
-      } * to_stream
+          Stream.new(next_fn, [[]] + streams)
+        }
     },
 
     ## lists
@@ -632,13 +625,13 @@ class F
     reverse: foldl.(->(acc, el) { cons.(el, acc) }, []), ## or foldr.(->(el,acc) { snoc.(acc, el) }, [])
     length: foldl.(inc, 0),
     concat: flatmap.(to_stream),
-    enconcat: ->(left_stream, el) { append.(left_stream) * cons.(el) },
+    enconcat: ->(left_stream, el,right_stream) { append.(left_stream.to_stream) * cons.(el) * to_stream <= right_stream },
     all?: ->(f) { foldl.(->(acc, el) { f.(el) && acc }, true) }, ## this is going to become equal.(Nothing) * first * find_where.(F.not.(f))
     any?: ->(f) { foldl.(->(acc, el) { acc || f.(el) }, false) },
     replace: ->(to_replace, to_replace_with) {map.(->(x) { x == to_replace ? to_replace_with : x })},
     replace_with: ->(to_replace_with, to_replace) { map.(->(x) { x == to_replace ? to_replace_with : x }) },
     find_where: ->(fn){ first * filter.(fn) },
-    transpose: ->(stream_of_streams) { zip.( *(stream_of_streams) ) },
+    transpose: ->(stream_of_streams) { zip.( *(stream_of_streams.to_stream) ) },
   
     # stream folds useful for containers of booleans
     ands: foldl.(self.and, true),
@@ -653,7 +646,7 @@ class F
 
     sum: foldl.(plus, 0),
     product: foldl.(times, 1),
-    mean: ->(l) { div_from(*( [sum,length].(l) )) }, ## this works because (sum + length).(l)== [sum.(l), length.(l)]
+    mean: ->(l) { div_from.(*( [sum,length].(l) )) }, ## this works because (sum + length).(l)== [sum.(l), length.(l)]
     sum_of_squares: foldl.(plus, 0) * map.(slf.(times)),
     ## this is a two-pass algorithm
     sum_of_differences_from_mean_two_pass: ->(mean) { foldl.(plus, 0) * map.(square * sub_by.(mean)) } * ->(l) { div_from(*( (sum + length).(l) )) }

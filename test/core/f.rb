@@ -838,10 +838,11 @@ tests = [
       g = F.zip_with.(F.plus)
       
       
-      check.("equal", f.([2,3,4]).([4,5,6]), [[2,4], [3,5], [4,6]])
+      check.("equal", f.([2,3,4],[4,5,6]), [[2,4], [3,5], [4,6]])
       check.("equal", g.([2,3,4]).([4,5,6]), [6, 8, 10])
       check.("equal", f.([2,3,4]).([4,5,6]).class, Stream)
-      check.("equal", f.([2,3,4]).([4,5,6],[7,8,9]), [[2,4,7], [3,5,8], [4,6,9]])
+      check.("equal", f.([2,3,4],[5,6,7],[8,9,10]), [[2,5,8], [3,6,9], [4,7,10]])
+      check.("equal", f.([2,3,4]).([5,6,7],[8,9,10]), [[2,5,8], [3,6,9], [4,7,10]])
       #check.("raises", -> { f.(F.empty) }, "foobar")
       
     }
@@ -974,7 +975,7 @@ tests = [
     ->() { 
       f = F.enconcat
       check.("equal", f.([2,3,4], 5, [6,7]), [2,3,4,5,6,7])
-      check.("equal", f.([2,3,4].to_stream).class, Stream)
+      check.("equal", f.([2,3,4], 5, [6,7]).class, Stream)
       
     }
 
@@ -1176,7 +1177,7 @@ tests = [
 
     ->() { 
       f = F.fold.(F.plus, 0)
-      check.("equal", f.([2,3,4]), [10])
+      check.("equal", f.([2,3,4]), [9])
       check.("equal", f.([2,3,4]).class, Stream)
       
     }
