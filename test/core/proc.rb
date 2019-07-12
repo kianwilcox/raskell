@@ -13,7 +13,7 @@ tests = [
       check.("equal", f.().kind_of?(Proc), true)
       check.("equal", f.(1,2,3).kind_of?(Proc), true)
       check.("equal", f.(1,2).(3).(4,5).kind_of?(Proc), true)
-      check.("not_equal", f.(1,2).(3).(4,5).(6).kind_of?(Proc), true)
+      check.("equal", f.(1,2).(3).(4,5).(6).kind_of?(Proc), false)
       
     }
 

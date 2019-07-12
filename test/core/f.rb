@@ -1293,16 +1293,9 @@ tests = [
 
   ],
 
+  
+
 =begin
-  ["multizip should take n streams, and produce a stream that is a result of making a list of the n streams together until the shorter is exhausted",
-
-    ->() { 
-      f = F.multizip
-      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream, [9,10,11,12].to_stream), [[1,5,9], [2,6,10], [3,7,11], [4,8,12]])
-      check.("equal", f.([1,2,3,4,0].to_stream, [5,6,7,8].to_stream, [9,10,11,12].to_stream).class, Stream)
-    }
-
-  ],
 
   ["long_zip should take two streams, and produce a stream that is a result of pairing the two streams together",
 

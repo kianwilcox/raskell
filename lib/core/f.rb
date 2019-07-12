@@ -1,4 +1,4 @@
-require 'singleton'
+
 
 class F
   # stream combinators
@@ -36,20 +36,14 @@ class F
     self.to_hash
   end
 
-  
-
-
-  include Singleton
 
   @@stage_0_defs = {
-
-    
-
     infinity: Float::INFINITY,
     negative_infinity: -Float::INFINITY, 
     inf: Float::INFINITY,
     ninf: -Float::INFINITY,
     id: Identity.new, # ->(x) { x }
+    apply_with2: ->(y, f, x) { f.(x,y)},
     apply: ->(f, *xs) { f.(*xs) },
     apply_with: ->(x,f) { f.(x) }, # flip * apply
     compose: ->(f,g) { f * g },
@@ -119,6 +113,10 @@ class F
     equals: ->(x,y) { x == y },
     equal: ->(x,y) { x == y },
     eq: ->(x,y) { x === y },
+    is_gt: ->(y,x) { x > y },
+    is_lt: ->(y,x) { x < y },
+    is_gte: ->(y,x) { x >= y },
+    is_lte: ->(y,x) { x <= y },
     gt: ->(x,y) { x > y },
     lt: ->(x,y) { x < y },
     gte: ->(x,y) { x >= y },
@@ -364,7 +362,7 @@ class F
   @@stage_0_5_defs={
     double: slf.(plus),
     square: slf.(times),
-
+    app: ->(*fs) { apply.(fs.first, fs.drop(1)) },
     snoc: ->(el) {
 
        ->(stream) { 
@@ -411,13 +409,8 @@ class F
         Stream.new(next_fn, stream)
       } * to_stream
     },
-  }
-  @@stage_0_5_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 
-  @@stage_1_defs = {
-  
-    ## functional combinators - higher-order functions generic over their container
-    foldl: ->(f,u) { 
+    foldleft: ->(f,u) { 
     
       ->(stream) {
         next_item = stream.next_item
@@ -437,25 +430,7 @@ class F
     
     },
 
-    ## implement this and foldl instead as first implementing scanl and scanr, and then choosing the very last value of the stream
-    ## so that we can have an abort-fold-when that gives the value collected so far like a loop that terminates early
-    foldr: ->(f,u) { 
-      ->(stream) {
-        next_item = stream.next_item
-        if next_item == [:done]
-          u
-        elsif next_item.first == :skip 
-          foldr.(f, u, next_item.last)
-        elsif next_item.first == :yield
-          f.(next_item[1], foldr.(f, u, next_item.last))
-        else
-          raise "#{next_item} is improperly formed for a Stream"
-        end
-      } * to_stream
-        
-    },
-
-    scanl: ->(f,u) { 
+    scanleft: ->(f,u) { 
       ->(stream) {
         next_fn = ->(state) {
           result_so_far = state.first
@@ -478,6 +453,32 @@ class F
         Stream.new(next_fn, [u, stream])
       } * to_stream
     
+    },
+  }
+  @@stage_0_5_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
+
+  @@stage_1_defs = {
+
+    apply_fn: -> (f, *args) { f.(*args)},
+  
+    ## functional combinators - higher-order functions generic over their container
+
+    ## implement this and foldl instead as first implementing scanl and scanr, and then choosing the very last value of the stream
+    ## so that we can have an abort-fold-when that gives the value collected so far like a loop that terminates early
+    foldr: ->(f,u) { 
+      ->(stream) {
+        next_item = stream.next_item
+        if next_item == [:done]
+          u
+        elsif next_item.first == :skip 
+          foldr.(f, u, next_item.last)
+        elsif next_item.first == :yield
+          f.(next_item[1], foldr.(f, u, next_item.last))
+        else
+          raise "#{next_item} is improperly formed for a Stream"
+        end
+      } * to_stream
+        
     },
 
     map: ->(fn) { 
@@ -611,6 +612,38 @@ class F
       next_item = stream.next_item
       Stream.new(next_fn, [next_item, next_item.last])
     } * to_stream,
+
+    suffixes: ->(stream) {
+      next_fn = ->(strm) {
+        next_item = strm.next_item
+        if next_item.first == :done
+          [:yield, empty, empty]
+        elsif next_item.first == :yield
+          [:yield, strm, Stream.new(next_fn, next_item.last)]
+        elsif next_item.first == :skip
+          [:skip, Stream.new(next_fn, next_item.last)]
+        else
+          raise("#{next_item} is a malformed stream response!")
+        end
+      }
+      Stream.new(next_fn, stream)
+    } * to_stream,
+
+    prefixes: ->(stream) {
+      next_fn = ->(strm) {
+        next_item = strm.next_item
+        if next_item.first == :done
+          [:yield, strm, empty]
+        elsif next_item.first == :yield
+          [:yield, strm, Stream.new(next_fn, next_item.last)]
+        elsif next_item.first == :skip
+          [:skip, Stream.new(next_fn, next_item.last)]
+        else
+          raise("#{next_item} is a malformed stream response!")
+        end
+      }
+      Stream.new(next_fn, stream)
+    } * to_stream,
     
 
   }
@@ -624,6 +657,7 @@ class F
     unsnoc: ->(s) { append(wrap(init.(s)), last.(s)) } * to_stream,
     reverse: foldl.(->(acc, el) { cons.(el, acc) }, []), ## or foldr.(->(el,acc) { snoc.(acc, el) }, [])
     length: foldl.(inc, 0),
+    length_at_least: ->(n) { ->(x) { x != Nothing } * find_where.(equals.(n)) * scanl.(inc, 0) },
     concat: flatmap.(to_stream),
     enconcat: ->(left_stream, el,right_stream) { append.(left_stream.to_stream) * cons.(el) * to_stream <= right_stream },
     all?: ->(f) { foldl.(->(acc, el) { f.(el) && acc }, true) }, ## this is going to become equal.(Nothing) * first * find_where.(F.not.(f))
@@ -632,7 +666,12 @@ class F
     replace_with: ->(to_replace_with, to_replace) { map.(->(x) { x == to_replace ? to_replace_with : x }) },
     find_where: ->(fn){ first * filter.(fn) },
     transpose: ->(stream_of_streams) { zip.( *(stream_of_streams.to_stream) ) },
-  
+    tail: rest,
+    prefix: init,
+    suffix: rest,
+    head: first,
+    inits: prefixes,
+    tails: suffixes,
     # stream folds useful for containers of booleans
     ands: foldl.(self.and, true),
     ors: foldl.(self.or, false),
@@ -670,19 +709,115 @@ class F
     #init: take_except.(1),
     fold: ->(fn, u) { final * scanl.(fn, u) },
     slice_by: ->(starts_with_fn, ends_with_fn) { take_until.(ends_with_fn) * drop_until.(starts_with_fn) },
-    interleave: ->(xs, ys) { concat * transpose.(xs).(ys) }, ## remove the xs ys when I fix zip_with to work with *args and return a lambda expecting another if it only gets one stream to zip
-    
+    interleave: ->(xs, ys) { concat <= zip_with.(list).(xs,ys) }, ## remove the xs ys when I fix zip_with to work with *args and return a lambda expecting another if it only gets one stream to zip
+    contains_slice?: ->(stream) {  },
+    partition_by: ->(fn, xs) {
+      folded_filter = ->(f) { foldl.(->(acc, el) { acc << el if f.(el); acc }, []) }
+      (folded_filter.(fn) + folded_filter.(->(x) { !fn.(x) })) * to_stream <= xs
+    },
   }
 
   @@stage_3_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 
   @@stage_4_defs = {
+    union: ->(xs) {
+      ->(ys) {
+          to_stream * to_set <= append.(xs, ys)
+        } * to_stream
+    } * to_stream,
 
+    intersect: ->(xs) {
+      ->(ys) {
+          to_stream <= (to_set.(xs) & to_set.(ys))
+        } * to_stream
+    } * to_stream,
+
+    difference: ->(xs) {
+      ->(ys) {
+          to_stream <= (to_set.(xs) - to_set.(ys))
+        } * to_stream
+    } * to_stream,
+
+    cartesian_product: ->(xs) {
+      ->(ys) {
+          flatmap.(->(x) { map.(->(y) { [x,y] }, ys) }, xs)
+        } * to_stream
+    } * to_stream,
+
+    unzip: ->(xs) {
+      [map.(->(x) { first.(x) }).(xs),map.(->(x) { last.(x) }).(xs)]
+    } * to_stream,
+=begin
+    group_by: ->(fn, xs) {
+      foldl.(->(acc, el) { 
+          key = fn.(el)
+          acc[key] ||= []
+          acc[key] << el
+          acc 
+        }, {}).(to_stream.(xs))
+    },
+    group_by_and_summarize: ->(group_fn, summary_fn) {
+      map.(summary_fn) * group_by.(group_fn)
+    },
+=end
+    window: ->(n) {
+      map.(take.(n)) * suffixes
+    },
+
+
+    quicksort: ->() {
+      # qs = ->(xs) {
+      #   pivot = head.(xs)
+      #   if pivot == Nothing
+      #     empty
+      #   else
+      #     partitions = partition_by.(F.is_gt.(pivot)) <= tail.(xs)
+      #     enconcat.(qs * first <= partitions, pivot, qs * last <= partitions)
+      #   end
+      # } * to_stream
+    }.()
   }
 
   @@stage_4_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 end
   #std
+
+class Stream
+
+  def [](first, last=-1)
+    if last == -1
+      i = args.first
+      F.first * F.drop.(i)
+    elsif first < 0 && last < 0
+      F.drop_except.(last.abs - 1) * F.drop_except.(first.abs) <= self
+      ##todo 
+    else
+      raise ""
+    end
+
+  end
+
+  ## cartesian product
+  def **(stream)
+    F.cartesian_product.(self, stream)
+  end
+
+  def +(stream)
+     F.append.(self, stream)
+  end
+
+  def -(stream)
+    F.difference.(self, stream)
+  end
+
+  def |(stream)
+    F.union.(self, stream)
+  end
+
+  def &(stream)
+    F.intersect.(self, stream)
+  end
+end
 
 =begin
 ## functionals useful for lists ( but which work on anything supporting .each, and will yield a list )
@@ -694,13 +829,6 @@ end
 intercalate = #->(el) { init.(foldl.(, []))}
 intersperse = 
 
-
-intersection
-union
-difference
-cartesian_product
-
-unzip
 updated
 zip_with_index
 
@@ -726,7 +854,6 @@ random
 randomN
 
 
-slice_by
 partition_at
 partition_by
 split_by
@@ -738,9 +865,6 @@ span
 
 
 grouped
-groupBy
-groupByAndFoldWith == fmap.(fold(with_fn, unit)) * group_by 
-sliding/window
 
 permutations
 combinations
@@ -748,7 +872,7 @@ combinations
 sort_by ## insertionSort
 scanr
 
-## functionals useful in untyped languages like ruby - arbitrarily deep map, zip, and merge
+## functionals useful in untyped languages like ruby - arbitrarily deep map, zip, and merge - and deep_clone
 
 deep_map ## for a dictionary, maps across all its values deep until not-a-dictionary
         ## for a list, maps  across all its values deep until not-a-list
@@ -764,7 +888,7 @@ deep_diff ## implement with deep_zip and deep_map
 =begin The below is for later implementation
 
 
-quicksort ## use stream fusion
+quicksort ## use stream fusion == quicksort 
 mergesort ## use stream fusion
 
 deepMap

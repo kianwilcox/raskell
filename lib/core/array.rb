@@ -2,6 +2,15 @@
 
 class Array
 
+  ## ** is cartesian product
+  def **(arr)
+    self.map {|x| arr.map { |y| [x,y] } }.foldl(->(acc,el) { acc + el }, [])
+  end
+
+  def deep_clone
+    map(&:deep_clone)
+  end
+
   def empty
     []
   end
@@ -68,6 +77,65 @@ class Array
   
 end
 
+class String
+
+  def self.empty
+    ""
+  end
+
+  def empty?
+    self == ""
+  end
+
+  def first
+    self[0]
+  end
+
+  def take(n)
+    if n == 0
+      ""
+    elsif n >= self.length
+      self
+    else
+      self.slice(0, n)
+    end
+  end
+
+  def drop(n)
+    if n == 0
+      self
+    elsif n >= self.length
+      ""
+    else
+      self.slice(n, self.length)
+    end
+  end
+
+  def self.next_item
+    next_fn = ->(xs) { xs.empty? ? [:done] : [:yield, xs.first, Stream.new(next_fn, xs.drop(1))] }
+    next_fn
+  end
+
+  def self.to_stream(xs)
+    Stream.new(self.next_item, xs)
+  end
+
+  def to_stream
+    self.class.to_stream(self)
+  end
+
+  alias_method :standard_equals, :==
+  def ==(obj)
+    obj.kind_of?(Stream) ? self.to_stream == obj : standard_equals(obj)
+  end
+
+  alias_method :standard_triple_equals, :===
+  def ===(obj)
+    obj.kind_of?(Stream) ? self.to_stream === obj : standard_triple_equals(obj)
+  end
+
+end
+
 require 'set'
 
 class Set
@@ -118,6 +186,10 @@ class Hash
   alias_method :standard_triple_equals, :===
   def ===(obj)
     obj.kind_of?(Stream) ? self.to_stream === obj : standard_triple_equals(obj)
+  end
+
+  def deep_clone
+    Hash.new(self.map{|k,v| [k.deep_clone, v.deep_clone]})
   end
 
 end
