@@ -1,6 +1,6 @@
 
-
-class F
+## module System 
+class F ## System::F to use 3;) --- or, you can just extend with System, and get the F for free.
   # stream combinators
   @@to_stream = ->(xs) { xs.to_stream }
   
@@ -360,6 +360,8 @@ class F
 
 
   @@stage_0_5_defs={
+    empty?: F.equal.(empty),
+    null?: F.equal.(empty),
     double: slf.(plus),
     square: slf.(times),
     app: ->(*fs) { apply.(fs.first, fs.drop(1)) },
@@ -410,6 +412,24 @@ class F
       } * to_stream
     },
 
+    mapleft: ->(fn) { 
+        ->(stream) {
+          next_fn = ->(state) {
+            next_el = state.next_item
+            if next_el == [:done]
+              [:done]
+            elsif next_el.first == :skip
+              [:skip, Stream.new(next_fn, next_el.last)]
+            elsif next_el.first == :yield
+              [:yield, fn.(next_el[1]), Stream.new(next_fn, next_el.last)]
+            else
+              raise "#{next_el.inspect} is not a valid stream state!"
+            end
+          } 
+          Stream.new(next_fn, stream) 
+        } * to_stream
+    },
+
     foldleft: ->(f,u) { 
     
       ->(stream) {
@@ -457,6 +477,8 @@ class F
   }
   @@stage_0_5_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 
+  self.define_singleton_method(:zip_with_index) { F.zip_with.(F.list).(F.range.(0, F.infinity)) }
+
   @@stage_1_defs = {
 
     apply_fn: -> (f, *args) { f.(*args)},
@@ -481,23 +503,6 @@ class F
         
     },
 
-    map: ->(fn) { 
-        ->(stream) {
-          next_fn = ->(state) {
-            next_el = state.next_item
-            if next_el == [:done]
-              [:done]
-            elsif next_el.first == :skip
-              [:skip, Stream.new(next_fn, next_el.last)]
-            elsif next_el.first == :yield
-              [:yield, fn.(next_el[1]), Stream.new(next_fn, next_el.last)]
-            else
-              raise "#{next_el.inspect} is not a valid stream state!"
-            end
-          } 
-          Stream.new(next_fn, stream) 
-        } * to_stream
-    },
     filter: ->(fn) { 
       ->(stream) {
         next_fn = ->(state) {
@@ -613,24 +618,11 @@ class F
       Stream.new(next_fn, [next_item, next_item.last])
     } * to_stream,
 
+    
+
     suffixes: ->(stream) {
       next_fn = ->(strm) {
-        next_item = strm.next_item
-        if next_item.first == :done
-          [:yield, empty, empty]
-        elsif next_item.first == :yield
-          [:yield, strm, Stream.new(next_fn, next_item.last)]
-        elsif next_item.first == :skip
-          [:skip, Stream.new(next_fn, next_item.last)]
-        else
-          raise("#{next_item} is a malformed stream response!")
-        end
-      }
-      Stream.new(next_fn, stream)
-    } * to_stream,
-
-    prefixes: ->(stream) {
-      next_fn = ->(strm) {
+        puts strm.inspect
         next_item = strm.next_item
         if next_item.first == :done
           [:yield, strm, empty]
@@ -646,9 +638,16 @@ class F
     } * to_stream,
     
 
+
   }
 
   @@stage_1_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
+
+  @@stage_1_5_defs = {
+    prefixes: foldr.(->(el, acc) { cons.(empty, map.(cons.(el), acc)) }, wrap.(empty)),
+  }
+
+  @@stage_1_5_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 
   @@stage_2_defs = {
     ## stream functions
@@ -660,11 +659,11 @@ class F
     length_at_least: ->(n) { ->(x) { x != Nothing } * find_where.(equals.(n)) * scanl.(inc, 0) },
     concat: flatmap.(to_stream),
     enconcat: ->(left_stream, el,right_stream) { append.(left_stream.to_stream) * cons.(el) * to_stream <= right_stream },
-    all?: ->(f) { foldl.(->(acc, el) { f.(el) && acc }, true) }, ## this is going to become equal.(Nothing) * first * find_where.(F.not.(f))
-    any?: ->(f) { foldl.(->(acc, el) { acc || f.(el) }, false) },
+    
     replace: ->(to_replace, to_replace_with) {map.(->(x) { x == to_replace ? to_replace_with : x })},
     replace_with: ->(to_replace_with, to_replace) { map.(->(x) { x == to_replace ? to_replace_with : x }) },
     find_where: ->(fn){ first * filter.(fn) },
+    find_last_where: ->(fn){ last * filter.(fn) },
     transpose: ->(stream_of_streams) { zip.( *(stream_of_streams.to_stream) ) },
     tail: rest,
     prefix: init,
@@ -672,9 +671,9 @@ class F
     head: first,
     inits: prefixes,
     tails: suffixes,
-    # stream folds useful for containers of booleans
-    ands: foldl.(self.and, true),
-    ors: foldl.(self.or, false),
+    starts_with: ->(slice, xs) {  },
+    ends_with: ->(slice, xs) {  },
+    intersperse: ->(x, xs) { rest * flatmap.(->(y) { [x, y] }) <= xs.to_stream },
 
     # stream folds useful for containers of numbers (core statistics algorithms)
     
@@ -685,10 +684,7 @@ class F
 
     sum: foldl.(plus, 0),
     product: foldl.(times, 1),
-    mean: ->(l) { div_from.(*( [sum,length].(l) )) }, ## this works because (sum + length).(l)== [sum.(l), length.(l)]
-    sum_of_squares: foldl.(plus, 0) * map.(slf.(times)),
-    ## this is a two-pass algorithm
-    sum_of_differences_from_mean_two_pass: ->(mean) { foldl.(plus, 0) * map.(square * sub_by.(mean)) } * ->(l) { div_from(*( (sum + length).(l) )) }
+    
     ## this is a one-pass algorithm, but only an estimate
     #sum_of_squares_of_differences_from_mean_iterative
     ## - need length, sum, sum_of_squares, M1,M2,M3, deltas, etc... see https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
@@ -702,24 +698,47 @@ class F
   @@stage_2_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 
   @@stage_3_defs = {
+    first_index_where: ->(fn) { first * find_where.( fn * last ) * zip_with_index },
+    last_index_where: ->(fn) { first * last * filter.( fn * last ) * zip_with_index },
+    
+    mean: ->(l) { div_from.(*( [sum,length].(l) )) }, ## this works because (sum + length).(l)== [sum.(l), length.(l)]
+    sum_of_squares: sum * map.(square),
+    ## this is a two-pass algorithm
+    sum_of_square_difference_from_mean_two_pass: ->(mean) { sum * map.(square * sub_by.(mean)) } * ->(l) { div_from(*( (sum + length).(l) )) },
+
+    sum_of_differences_from_estimated_mean: ->(xs) {
+      sum * map.(square * sub_by.())
+    },
+
+    # stream folds useful for containers of booleans
+    ands: ->(x) { x == Nothing } * find_where.(F.equals.(false)),
+    ors: ->(x) { x != Nothing } * find_where.(F.equals.(true)),
+
+    
+    ## stream functionals
     contains?: ->(el) { F.not * F.equal.(Nothing) * find_where.(equals.(el)) },
     does_not_contain?: ->(el) { F.equal.(Nothing) * find_where.(equals.(el)) },
-
-    ## stream functionals
-    #init: take_except.(1),
+    contains_slice?: ->(slice) { any?.(starts_with.(slice)) * tails },
+    all?: ->(f) { ->(x) { x == Nothing } * find_where.(->(x) { !f.(x)})}, ## this is going to become equal.(Nothing) * first * find_where.(F.not.(f))
+    any?: ->(f) { ->(x) { x != Nothing } * find_where.(f)},
     fold: ->(fn, u) { final * scanl.(fn, u) },
     slice_by: ->(starts_with_fn, ends_with_fn) { take_until.(ends_with_fn) * drop_until.(starts_with_fn) },
     interleave: ->(xs, ys) { concat <= zip_with.(list).(xs,ys) }, ## remove the xs ys when I fix zip_with to work with *args and return a lambda expecting another if it only gets one stream to zip
+    intercalate: ->(xs, xss) { concat.intersperse.(xs, xss) },
     contains_slice?: ->(stream) {  },
     partition_by: ->(fn, xs) {
       folded_filter = ->(f) { foldl.(->(acc, el) { acc << el if f.(el); acc }, []) }
       (folded_filter.(fn) + folded_filter.(->(x) { !fn.(x) })) * to_stream <= xs
     },
+
   }
 
   @@stage_3_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
 
   @@stage_4_defs = {
+    last_index_of: ->(x) { last_index_where.(F.equal.(x)) },
+    first_index_of: ->(x) { first_index_where.( F.equal.(x) ) },
+
     union: ->(xs) {
       ->(ys) {
           to_stream * to_set <= append.(xs, ys)
@@ -734,7 +753,8 @@ class F
 
     difference: ->(xs) {
       ->(ys) {
-          to_stream <= (to_set.(xs) - to_set.(ys))
+          to_remove = to_set.(ys)
+          filter.(->(x) { !ys.include?(x)}) <= xs
         } * to_stream
     } * to_stream,
 
@@ -745,7 +765,7 @@ class F
     } * to_stream,
 
     unzip: ->(xs) {
-      [map.(->(x) { first.(x) }).(xs),map.(->(x) { last.(x) }).(xs)]
+      map.(xs) + map.(last) <= xs
     } * to_stream,
 =begin
     group_by: ->(fn, xs) {
@@ -764,21 +784,65 @@ class F
       map.(take.(n)) * suffixes
     },
 
+    subsequences: ->() {
+      subs = ->(ys) { ys == empty ? wrap.(empty) : subs.(rest.(ys)) ** [F.id, F.cons.(first.(ys))].to_stream }
+    }.(), #wrap.(empty),
+    ## Using Control.Applicative
+    # subs [] = [[]]
+    # subs (x:xs) = subs xs <**> [id, (x :)] 
+    ## subsequences is useful for fuzzy sequence matching style algorithms a la command tab in sublime, 
+    ### or figuring out if some melody or progressionis an elaboration of another (same thing), etc...
+    ## is there any way to do this with a left fold instead of a right one?
 
+
+    continuous_subsequences: filter.(F.not * empty?) * flatmap.(prefixes) * suffixes,
+    ## continuous subsequences is useful for exact inside sequence matching a la find in sublime
+    
+=begin
     quicksort: ->() {
-      # qs = ->(xs) {
-      #   pivot = head.(xs)
-      #   if pivot == Nothing
-      #     empty
-      #   else
-      #     partitions = partition_by.(F.is_gt.(pivot)) <= tail.(xs)
-      #     enconcat.(qs * first <= partitions, pivot, qs * last <= partitions)
-      #   end
-      # } * to_stream
-    }.()
+      qs = ->(xs) {
+        pivot = head.(xs)
+        if xs == empty
+          empty
+        else
+          partitions = partition_by.(F.is_gt.(pivot)) <= tail.(xs)
+          enconcat.(qs * first <= partitions, pivot, qs * last <= partitions)
+        end
+      } * to_stream ### if only this wasn't infinitely recursing...
+    }.(),
+=end
+
+    group_by: ->(fn) { 
+      next_fn = ->(state) {
+        strm = state.last
+        group = state.first
+        next_item = strm.next_item
+        tag = next_item.first
+        val = next_item[1]
+        next_stream = next_item.last
+        if tag == :done && group == []
+          [:done]
+        elsif tag == :done
+          [:yield, group, empty]
+        elsif tag == :skip
+          [:skip, Stream.new(next_fn, [group, next_stream])]
+        elsif tag == :yield && (group.length == 0 || fn.(val) == fn.(group.last))
+          [:skip, Stream.new(next_fn, [group + [val], next_stream])]
+        elsif tag == :yield
+          [:yield, group, Stream.new([[], next_stream])]
+        else
+          raise "#{next_item} is a malformed stream response!"
+        end
+      }
+      Stream.new(next_fn, [[], state])
+    } * to_stream,
+
+
+
   }
 
   @@stage_4_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
+  self.define_singleton_method(:group) { ->(xs) { group_by.(id) } }
 end
   #std
 
@@ -797,9 +861,50 @@ class Stream
 
   end
 
-  ## cartesian product
-  def **(stream)
+  def first
+    F.first.(self)
+  end
+
+  def last
+    F.last.(self)
+  end
+
+  def rest
+    F.rest.(self)
+  end
+
+  def any?(fn=F.id)
+    F.any?(fn) <= self   
+  end
+
+  def all?(fn=F.id)
+    F.all?(fn) <= self   
+  end
+
+  ## Applicative <**> 
+  ## [1,2,3] ** [id, double]
+  ## [1,2,2,4,3,6]
+  ## defaults to cartesian product if you haven't got any procs in there
+  def **(stream_of_fns)
+    !F.any?.(->(x) { x.kind_of? Proc }) ? self^stream_of_fns : F.flatmap.(->(x) { stream_of_fns.(x).to_stream }).(self)
+  end
+
+  #cartesian product
+  def ^(stream)
     F.cartesian_product.(self, stream)
+  end
+
+  ## zip or applicative * depending on if there any function values in the array/stream ## or should it be interleave to go with % below?
+  #[id, double] * [1,2,3]
+  #[1,2,3,2,4,6]
+  def *(stream, is_zip=false)
+    is_zip || !F.any?.(->(x){ x.kind_of? Proc }) ? F.zip.(self, stream) : F.flatmap.(->(f) { F.map.(f) <= stream.to_stream }).(self.to_stream)
+  end
+
+  ## %2 is odds, rest %2 is evens. doing % 3 breaks into every third item. % n does every nth as a stream
+  ## [odds, evens].(interleave.(xs,ys)) == [xs,ys] 
+  def %(n)
+    F.filter.(->(x) { x % n == 0}).(self)
   end
 
   def +(stream)
@@ -810,7 +915,10 @@ class Stream
     F.difference.(self, stream)
   end
 
-  def |(stream)
+  ## this kind of conflicts with | being function pipelining - maybe change that to use < and >  instead of * and |  so we can keep ruby-ishness
+  ## but we'll still need something for >>=, <**>, <$> and <.> later...
+
+  def |(stream) #
     F.union.(self, stream)
   end
 
@@ -819,52 +927,54 @@ class Stream
   end
 end
 
+class Array
+
+  ## Applicative <**> 
+  ## [1,2,3] ** [id, double]
+  ## [1,2,2,4,3,6]
+  def **(arr)
+    !arr.any?{|x| x.kind_of? Proc } ? self^arr : F.flatmap.(->(x) { arr.to_stream.(x) }).(self).to_a
+  end
+
+  ## cartesian product
+  def ^(arr)
+    self.map {|x| arr.to_a.map { |y| [x,y] } }.foldl(->(acc,el) { acc.push(el) }, [])
+  end
+
+  ## cartesian product or applicative * depending on if there any function values in the array/stream
+  #[id, double] * [1,2,3]
+  #[1,2,3,2,4,6]
+  def *(arr, is_zip=false)
+    is_zip || !self.any?{|x| x.kind_of? Proc } ? self.zip(arr.to_a) : F.flatmap.(->(f) { F.map.(f) <= arr.to_stream }).(self.to_stream).to_a
+  end
+
+
+end
+
 =begin
 ## functionals useful for lists ( but which work on anything supporting .each, and will yield a list )
 
 
 
-
-
-intercalate = #->(el) { init.(foldl.(, []))}
-intersperse = 
-
 updated
-zip_with_index
 
-last_index_of
 last_index_of_slice
-last_index_where
-
-first_index_of
 first_index_of_slice
-first_index_where
+nth
+index_of
+index_where
+findIndex?
 
-subsequence/containsSlice
-endsWith
-startsWith
-
-index/nth
-indexOf
-first_index_of_slice
-indexWhere
-elemIndex
-findIndex
 random
 randomN
-
-
-partition_at
-partition_by
-split_by
 segmentLength
+
+partition_at = ->(n) { take.(n) + drop.(n) }
+split_by = ->(fn) { take_while.(fn) + drop_while.(fn) }
+
 splice
 patch
 span
-
-
-
-grouped
 
 permutations
 combinations

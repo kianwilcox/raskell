@@ -21,7 +21,7 @@ class Object
   end
 
   def deep_clone
-    self.respond_to?(:clone) && !self.kind_of?(Numeric) ? self.clone : self
+    self.respond_to?(:clone) && !self.kind_of?(Numeric) && !self.kind_of?(TrueClass) && !self.kind_of?(FalseClass) && !self.kind_of?(NilClass) ? self.clone : self
   end
 
 end

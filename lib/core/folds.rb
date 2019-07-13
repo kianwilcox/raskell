@@ -126,3 +126,63 @@ class Scanl
   end
 end
 F.define_singleton_method(:scanl) { Scanl.scanl }
+
+
+class Mapl
+   alias_method :standard_ruby_kind_of?, :kind_of?
+
+   def kind_of?(clazz)
+     [Proc].include?(clazz) || standard_ruby_kind_of?(clazz)
+   end
+
+   def initialize(*functions)
+       @functions = functions
+       self
+   end
+
+   def functions
+     @functions
+   end
+
+   def *(lamb)
+     ->(x) { self.( lamb.( x ) ) }
+   end
+
+   def |(lamb)
+     ->(x) { lamb.( self.( x ) ) }
+   end
+
+   def <=(val)
+     self.(val.())
+   end
+
+   def >=(lamb)
+     lamb.(self)
+   end
+
+   def +(mapl)
+     if mapl.kind_of?(Mapl)
+       Mapl.new(*(self.functions + mapl.functions))
+     else
+       raise "Cannot add two non-maps together"
+     end
+   end
+
+   def call(stream)
+     if stream.respond_to?(:to_stream)
+        if @functions.length > 1
+          F.mapleft.(@functions).(stream)
+        else
+          F.mapleft.(@functions.first).(stream)
+        end
+     else
+       raise "Cannot call Mapl on an object that does not have to_stream defined."
+     end
+   end
+
+  @@map = ->(f) { Mapl.new(f)} 
+  def self.map
+    @@map
+  end
+end
+F.define_singleton_method(:map) { Mapl.map }

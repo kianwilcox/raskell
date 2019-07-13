@@ -2,11 +2,6 @@
 
 class Array
 
-  ## ** is cartesian product
-  def **(arr)
-    self.map {|x| arr.map { |y| [x,y] } }.foldl(->(acc,el) { acc + el }, [])
-  end
-
   def deep_clone
     map(&:deep_clone)
   end
@@ -53,12 +48,19 @@ class Array
   end
 
   def self.next_item
-    next_fn = ->(xs) { xs.empty? ? [:done] : [:yield, xs.first, Stream.new(next_fn, xs.drop(1))] }
-    next_fn
+    next_fn = ->(state) { 
+      i = state.first
+      arr = state.last
+      if i == arr.length
+        [:done]
+      else
+        [:yield, arr[i], Stream.new(next_fn, [i+1, arr])]
+      end
+    }
   end
 
   def self.to_stream(xs)
-    Stream.new(self.next_item, xs)
+    Stream.new(self.next_item, [0, xs.deep_clone])
   end
 
   def to_stream

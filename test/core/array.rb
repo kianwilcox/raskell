@@ -123,6 +123,55 @@ tests = [
 
   ],
 
+=begin
+
+   ["* is interleave/zip? for Stream with no functions involved in the stream on the left",
+
+    ->() { 
+      f = F.from_stream |  F.map.(->(y) { y*2 }) |  F.map.(->(x) { x+10 })
+      g = F.to_stream
+      check.("equal", f.class, FromStream)
+      check.("equal", g.(f.([1])), [12])
+      ## there should be a check for fusion here
+      check.("equal", (f * g).class, Proc)
+      check.("equal", (g | f).class, Proc)
+    }
+
+  ],
+=end
+
+  ["* is applicative <*> if there are functions involved on the left, i.e. [F.id, F.double] * [1,2,3] == [1,2,3,2,4,6]",
+
+    ->() { 
+      check.("equal", [F.id, F.double] * [1,2,3], [1,2,3,2,4,6])
+    }
+
+  ],
+=begin
+  ["** is cartesian product when there are no functions involved in the stream on the right",
+
+    ->() { 
+      f = F.from_stream |  F.map.(->(y) { y*2 }) |  F.map.(->(x) { x+10 })
+      g = F.to_stream
+      check.("equal", f.class, FromStream)
+      check.("equal", g.(f.([1])), [12])
+      ## there should be a check for fusion here
+      check.("equal", (f * g).class, Proc)
+      check.("equal", (g | f).class, Proc)
+    }
+
+  ],
+=end
+
+  ["** is applicative <**> if there are functions, i.e. [1,2,3] ** [F.id, F.double] == [1,2,2,4,3,6]",
+
+    ->() { 
+     check.("equal", [1,2,3] ** [F.id, F.double], [1,2,2,4,3,6])
+    }
+
+  ],
+
+
 ]
 
 

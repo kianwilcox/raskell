@@ -88,28 +88,6 @@ class Stream
     from_stream.foldl(func, unit)
   end
 
-  def *(stream)
-    if stream.kind_of?(Stream)
-      next_fn1 = ->(state) {
-        #... and then Stream.new(next_fn2, ...)
-      }
-      next_fn2 = ->(state) {
-        #... and then Stream.new(next_fn1, ...)
-      }
-      Stream.new(next_fn, [self, stream])
-    else
-      raise "Cannot interleave a stream with a #{to_stream.class}"
-    end
-  end
-
-  def +(stream)
-    if stream.kind_of?(Stream)
-
-    else
-      "Cannot append a stream to a #{to_stream.class}"
-    end
-  end
-
   def call(*args)
     next_fn = ->(next_item) {
       tag = next_item.first

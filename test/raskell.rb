@@ -6,6 +6,7 @@ load 'test/core/integer.rb'
 load 'test/core/object.rb'
 load 'test/core/proc.rb'
 load 'test/core/core.rb'
+
 load 'test/core/folds.rb'
 #load 'test/core/streams.rb'
 load 'test/core/f.rb'

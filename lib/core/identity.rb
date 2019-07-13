@@ -17,6 +17,10 @@ class Identity
     lamb
   end
 
+  def +(lamb)
+    ->(x) { x } + lamb
+  end
+
   def <=(val)
     # feed data from the right
     self.(val.())
