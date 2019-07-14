@@ -10,10 +10,11 @@ class Stream
     self
   end
 
-  attr_accessor :state
-  def initialize(next_item, state)
-    @next_item = next_item
+  attr_accessor :state, :next_item_function
+  def initialize(next_func, state, options={})
+    @next_item_function = next_func
     @state = state
+    @options = options
     ## step_fn should return one of [:done], [:yield element stream], or [:skip stream]
     self
   end
@@ -69,11 +70,13 @@ class Stream
   end
 
   def next_item
-    @next_item.(@state)
+    result = @next_item_function.(@state)
+    @state[2] = @state[1].clone.drop(@state[0]) if @options[:type] == "enumerator"
+    result
   end
 
   def next_item_function
-    @next_item
+    @next_item_function
   end 
 
   def another
@@ -177,15 +180,6 @@ class FromStream
           'after' => after.after_function
         })
     else
-      puts "before is "
-      puts before.class
-      puts "with before function" if before.before_function
-      puts "with after function" if before.after_function
-      puts "---"
-      puts "after is"
-      puts after.class
-      puts "with before function" if after.before_function
-      puts "with after function" if after.after_function
       ->(xs) { after.(before.(xs)) }
     end
   end
@@ -283,15 +277,6 @@ class ToStream
         })
 
     else
-      # puts "before is "
-      # puts before.class
-      # puts "with before function" if after.before_function
-      # puts "with after function" if after.after_function
-      # puts "---"
-      # puts "after is"
-      # puts after.class
-      # puts "with before function" if after.before_function
-      # puts "with after function" if after.after_function
       ->(xs) { after.(before.(xs)) }
     end
   end
@@ -408,15 +393,6 @@ class StreamTransducer
         'after' => after.after_function
       })
     else
-      puts "before is "
-      puts before.class
-      puts "with before function" if before.before_function
-      puts "with after function" if before.after_function
-      puts "---"
-      puts "after is"
-      puts after.class
-      puts "with before function" if after.before_function
-      puts "with after function" if after.after_function
       ->(xs) { after.(before.(xs)) }
     end
   end

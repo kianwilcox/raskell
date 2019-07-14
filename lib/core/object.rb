@@ -1,7 +1,7 @@
 class Object
 
   def self.empty
-    Self.new
+    self.class.new
   end
 
   def fmap(fn)

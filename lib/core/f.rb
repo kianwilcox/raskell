@@ -527,13 +527,13 @@ class F ## System::F to use 3;) --- or, you can just extend with System, and get
           state = next_el.first
           potential_stream = next_el.last
           if potential_stream == Nothing
-            next_el = stream.next_item_function.(state)
+            next_el = state.next_item
             if next_el == [:done]
               [:done]
             elsif next_el.first == :skip
-              [:skip, Stream.new(next_fn, [next_el.last.state, Nothing])]
+              [:skip, Stream.new(next_fn, [next_el.last, Nothing])]
             elsif next_el.first == :yield
-              [:skip, Stream.new(next_fn, [next_el.last.state, fn.(next_el[1])])]
+              [:skip, Stream.new(next_fn, [next_el.last, fn.(next_el[1])])]
             else
               raise "#{next_el.inspect} is not a valid stream state!"
             end
@@ -550,7 +550,7 @@ class F ## System::F to use 3;) --- or, you can just extend with System, and get
             end
           end
         }
-        Stream.new(next_fn, [stream.state, Nothing]) 
+        Stream.new(next_fn, [stream, Nothing]) 
       } * to_stream
     
     },
@@ -622,7 +622,6 @@ class F ## System::F to use 3;) --- or, you can just extend with System, and get
 
     suffixes: ->(stream) {
       next_fn = ->(strm) {
-        puts strm.inspect
         next_item = strm.next_item
         if next_item.first == :done
           [:yield, strm, empty]
@@ -645,6 +644,7 @@ class F ## System::F to use 3;) --- or, you can just extend with System, and get
 
   @@stage_1_5_defs = {
     prefixes: foldr.(->(el, acc) { cons.(empty, map.(cons.(el), acc)) }, wrap.(empty)),
+    naturals: range.(1, infinity),
   }
 
   @@stage_1_5_defs.each_pair {|name, fn| self.define_singleton_method(name) { fn }}
@@ -723,7 +723,7 @@ class F ## System::F to use 3;) --- or, you can just extend with System, and get
     any?: ->(f) { ->(x) { x != Nothing } * find_where.(f)},
     fold: ->(fn, u) { final * scanl.(fn, u) },
     slice_by: ->(starts_with_fn, ends_with_fn) { take_until.(ends_with_fn) * drop_until.(starts_with_fn) },
-    interleave: ->(xs, ys) { concat <= zip_with.(list).(xs,ys) }, ## remove the xs ys when I fix zip_with to work with *args and return a lambda expecting another if it only gets one stream to zip
+    interleave: ->(xs, *ys) { ys.length > 0 ? concat <= zip_with.(list).(*([xs]+ys)) : ->(zs, *ys) { concat <= zip_with.(list).(*([xs,zs]+ys)) } }, ## remove the xs ys when I fix zip_with to work with *args and return a lambda expecting another if it only gets one stream to zip
     intercalate: ->(xs, xss) { concat.intersperse.(xs, xss) },
     contains_slice?: ->(stream) {  },
     partition_by: ->(fn, xs) {
@@ -837,6 +837,9 @@ class F ## System::F to use 3;) --- or, you can just extend with System, and get
       Stream.new(next_fn, [[], state])
     } * to_stream,
 
+    lines_from_file: ->(filepath, options={}) {
+      (options['separator'] ? IO.foreach(filepath, options['separator']) : IO.foreach(filepath)  ).to_stream
+    }
 
 
   }
@@ -847,6 +850,10 @@ end
   #std
 
 class Stream
+
+  def deep_clone
+    Stream.new(self.next_item_function, self.state.deep_clone)
+  end
 
   def [](first, last=-1)
     if last == -1
@@ -860,7 +867,37 @@ class Stream
     end
 
   end
-
+=begin ## ruby doesn't allow you to override the return value on []=, which means we'd have to destructively alter this Stream
+## but for some reason that isn't working very well - probably due to the need for self-reference. Guess my deep_clone isn't working 100%?
+  def []=(index, item)
+    next_fn = ->(state) {
+      i = state.first
+      strm = state.last
+      if 
+        [:yield, item, strm.next_item.last]
+      else
+        next_item = strm.next_item
+        tag = next_item.first
+        val = next_item[1]
+        next_stream = next_item.last
+        if tag == :done && i < index
+          [:skip, F.snoc(item, Array.new(index - i-1, Nothing).to_stream)]
+        elsif tag == :skip
+          [:skip, Stream.new(next_fn, next_stream)]
+        elsif tag == :yield && i == index
+          [:yield, item, next_stream]
+        elsif tag == :yield 
+          [:yield, val, Stream.new(next_fn, next_stream)]
+        else
+          raise "#{next_item} is a malformed stream response"
+        end
+      end
+    }
+    state = [0, self.deep_clone]
+    self.next_item_function = next_fn
+    self.state = state
+  end
+=end
   def first
     F.first.(self)
   end
@@ -948,6 +985,43 @@ class Array
     is_zip || !self.any?{|x| x.kind_of? Proc } ? self.zip(arr.to_a) : F.flatmap.(->(f) { F.map.(f) <= arr.to_stream }).(self.to_stream).to_a
   end
 
+
+end
+
+class Enumerator
+
+  def self.to_stream(enum)
+    enumerator_to_use = enum.clone.lazy
+    enumerator_to_store = enumerator_to_use.clone
+
+    next_fn = ->(state) {
+      idx = state[0]
+      enum_frozen = state[1]
+      enum_next = state[2]
+
+      next_state = [idx+1, enum_frozen, enum_next]
+      next_tag = :yield
+      begin
+        begin
+        next_item = enum_next.next
+     
+        rescue StopIteration => e
+          next_tag = :done
+        end
+      rescue IOError => e
+        next_state = [idx, enum_frozen, enum_frozen.clone.drop(i)]
+        next_tag = :skip
+      end
+      ## this {type: "enumerator" is a dirty hack - there has to be a better way to restore state after calling next_item}
+      next_tag == :done  ?  [:done]  :  [next_tag] + (next_tag == :yield ? [next_item] : []) + [Stream.new(next_fn, next_state, {type: "enumerator"})]
+
+    }
+    Stream.new(next_fn, [0, enumerator_to_store, enumerator_to_use], {type: "enumerator"})
+  end
+
+  def to_stream
+    self.class.to_stream(self)
+  end
 
 end
 
