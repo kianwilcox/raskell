@@ -1130,6 +1130,8 @@ class F ## @@System||=:F to use 3;) --- or, you can just extend with System, and
           acc 
         }, {}).(to_stream.(xs))
     }
+  end
+  
   def self.bucket_by_and_summarize
     @@bucket_by_and_summarize||= ->(group_fn, summary_fn) {
       map.(summary_fn) * bucket_by.(group_fn)
