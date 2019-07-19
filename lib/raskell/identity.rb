@@ -21,12 +21,12 @@ class Identity
     ->(x) { x } + lamb
   end
 
-  def <=(val)
+  def <<(val)
     # feed data from the right
     self.(val.())
   end
 
-  def >=(lamb)
+  def >>(lamb)
     # feed data from the left, assuming I am a wrapped Object of some sort
     lamb.(self)
   end

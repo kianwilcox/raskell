@@ -783,7 +783,7 @@ tests = [
 
   ],
 
-  ["drop_while.(n) drops items from a stream while the function matches, then returns the remainder",
+  ["drop_while.(fn) drops items from a stream while the function matches, then returns the remainder",
 
     ->() { 
       f = F.drop_while.(F.lt.(3))
@@ -807,7 +807,7 @@ tests = [
 
   ],
 
-  ["drop_until.(n) drops items from a stream until the function matches, then returns the remainder",
+  ["drop_until.(fn) drops items from a stream until the function matches, then returns the remainder",
 
     ->() { 
       f = F.drop_until.(F.lt.(5))
@@ -1295,7 +1295,7 @@ tests = [
 
 
 
-  ["inits([1,2,3]) is [[1], [1,2], [1,2,3], [2], [2,3], [3]]",
+  ["inits([1,2,3]) is [[],[1],[1,2],[1,2,3]]",
 
     ->() { 
       f = F.inits
@@ -1305,7 +1305,7 @@ tests = [
 
   ],
 
-  ["tails([1,2,3]) is [[1], [1,2], [1,2,3], [2], [2,3], [3]]",
+  ["tails([1,2,3]) is [[1,2,3],[2,3],[3],[]]",
 
     ->() { 
       f = F.tails

@@ -26,11 +26,11 @@ class Foldl
      ->(x) { lamb.( self.( x ) ) }
    end
 
-   def <=(val)
+   def <<(val)
      self.(val.())
    end
 
-   def >=(lamb)
+   def >>(lamb)
      lamb.(self)
    end
 
@@ -91,11 +91,11 @@ class Scanl
      ->(x) { lamb.( self.( x ) ) }
    end
 
-   def <=(val)
+   def <<(val)
      self.(val.())
    end
 
-   def >=(lamb)
+   def >>(lamb)
      lamb.(self)
    end
 
@@ -152,11 +152,11 @@ class Mapl
      ->(x) { lamb.( self.( x ) ) }
    end
 
-   def <=(val)
+   def <<(val)
      self.(val.())
    end
 
-   def >=(lamb)
+   def >>(lamb)
      lamb.(self)
    end
 

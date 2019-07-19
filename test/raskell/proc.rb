@@ -121,24 +121,24 @@ tests = [
 
   ],
 
-  [">= feeds data from the left and requires the value to be 'lifted' to lambda-space first",
+  [">> feeds data from the left and requires the value to be 'lifted' to lambda-space first",
 
     ->() { 
       f = ->(x) { x }
       check.("equal", f.(2), 2)
       check.("equal", 2.lift.class, Proc)
-      check.("equal", 2.lift >= f, 2)
+      check.("equal", 2.lift >> f, 2)
     }
 
   ],
 
-  ["<= feeds data from the right and works on lifted or unlifted values",
+  ["<< feeds data from the right and works on lifted or unlifted values",
 
     ->() { 
       f = ->(x) { x }
       check.("equal", f.(2), 2)
-      check.("equal", f <= 2, 2)
-      check.("equal", f <= 2.lift, 2)
+      check.("equal", f << 2, 2)
+      check.("equal", f << 2.lift, 2)
     }
 
   ],

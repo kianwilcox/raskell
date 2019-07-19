@@ -305,10 +305,10 @@ tests = [
   ],
 =end
 
-  ["* is applicative <*> if there are functions involved on the left, i.e. [F.id, F.double] * [1,2,3] == [1,2,3,2,4,6]",
+  ["** is applicative <*> if there are functions involved on the left, i.e. [F.id, F.double] * [1,2,3] == [1,2,3,2,4,6]",
 
     ->() { 
-      check.("equal", [F.id, F.double].to_stream * [1,2,3].to_stream, [1,2,3,2,4,6])
+      check.("equal", [F.id, F.double].to_stream ** [1,2,3].to_stream, [1,2,3,2,4,6])
     }
 
   ],
@@ -328,10 +328,10 @@ tests = [
   ],
 =end
 
-  ["** is applicative <**> if there are functions, i.e. [1,2,3] ** [F.id, F.double] == [1,2,2,4,3,6]",
+  ["^ is applicative <**> if there are functions, i.e. [1,2,3] ** [F.id, F.double] == [1,2,2,4,3,6]",
 
     ->() { 
-     check.("equal", [1,2,3].to_stream ** [F.id, F.double].to_stream, [1,2,2,4,3,6])
+     check.("equal", [1,2,3].to_stream ^ [F.id, F.double].to_stream, [1,2,2,4,3,6])
     }
 
   ],

@@ -1,1 +1,1 @@
-load 'lib/raskell.rb'
+require './lib/raskell'

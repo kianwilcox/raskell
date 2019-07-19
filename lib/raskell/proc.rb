@@ -2,6 +2,28 @@
 class Proc
   alias_method :standard_ruby_call, :call
   attr_accessor :is_tupled
+
+  def fmap(lamb)
+    self * lamb
+  end
+
+  def self.pure(arg)
+    ->(x) { arg }
+  end
+
+  def **(lamb) ## <*> from Control.Applicative
+    ->(x) { self.(x, lamb.(x)) }
+  end
+
+
+  ## <**> from Control.Applicative
+  def ^(lamb)
+    ->(x) { lamb.(self.(x), x) }
+  end
+
+  def bind(lamb)
+    ->(x) { lamb.(self.(x), x)}
+  end
   
   # Just a friendly reminder
   # .() is shorthand for .call() 
@@ -36,7 +58,7 @@ class Proc
     # if the result is a proc, make sure to unwrap further by recursively calling with any remaining arguments
     (result.kind_of?(Proc) && remaining_args.length > 0) || (result.kind_of?(Proc) && remaining_args.length == 0 && result.respond_to?(:arity) && result.arity == 0) ? result.call(*remaining_args) : result
   end
-  
+
   def *(lamb)
     # You, then me
     # like function composition
@@ -76,12 +98,12 @@ class Proc
     result
   end
 
-  def <=(val)
+  def <<(val)
     # feed data from the right
     self.(val.())
   end
 
-  def >=(lamb)
+  def >>(lamb)
     # feed data from the left, assuming I am a wrapped Object of some sort
     lamb.(self.())
   end

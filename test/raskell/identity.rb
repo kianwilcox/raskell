@@ -22,20 +22,20 @@ tests = [
 
   ],
 
-  ["Identity.new <= x is x",
+  ["Identity.new << x is x",
 
     ->() { 
       f = Identity.new
-      check.("equal", f <= 2, 2)
+      check.("equal", f << 2, 2)
     }
 
   ],
 
-  ["x.lift >= Identity.new is x",
+  ["x.lift >> Identity.new is x",
 
     ->() { 
       f = Identity.new
-      check.("equal", 2.lift >= f, 2)
+      check.("equal", 2.lift >> f, 2)
     }
 
   ],
