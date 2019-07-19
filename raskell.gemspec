@@ -5,7 +5,7 @@ require './lib/version.rb'
 
 Gem::Specification.new do |spec|
   spec.name          = "raskell"
-  spec.version       = Raskell::VERSION ## 0.1.0
+  spec.version       = Raskell::VERSION ## 0.1.1
   spec.authors       = ["Kian Wilcox"]
   spec.email         = ["kian+raskell@type.space"]
   spec.summary       = %q{Making Ruby a "Joy" to Work With}
