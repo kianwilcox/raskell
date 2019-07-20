@@ -1,188 +1,189 @@
 require 'singleton'
 
-
-class Foldl
-
-   alias_method :standard_ruby_kind_of?, :kind_of?
-
-   def kind_of?(clazz)
-     [Proc].include?(clazz) || standard_ruby_kind_of?(clazz)
-   end
-
-   def initialize(*monoids) # must be [fn, unit] pair, a monoid
-       @monoids = monoids
-       self
-   end
-
-   def monoids
-     @monoids
-   end
-
-   def *(lamb)
-     ->(x) { self.( lamb.( x ) ) }
-   end
-
-   def |(lamb)
-     ->(x) { lamb.( self.( x ) ) }
-   end
-
-   def <<(val)
-     self.(val.())
-   end
-
-   def >>(lamb)
-     lamb.(self)
-   end
-
-   def +(foldl)
-     if foldl.kind_of?(Foldl)
-       Foldl.new(*(self.monoids + foldl.monoids))
-     else
-       raise "Cannot add two non-folds together"
+module System
+  class Foldl
+  
+     alias_method :standard_ruby_kind_of?, :kind_of?
+  
+     def kind_of?(clazz)
+       [Proc].include?(clazz) || standard_ruby_kind_of?(clazz)
      end
-   end
-
-   def call(stream)
-     if stream.respond_to?(:to_stream)
-        if @monoids.length > 1
-          fn = ->(acc, el) { F.zip_with.(F.apply_fn).(@monoids.map(&:first), acc, @monoids.map {|x| el }).to_a }
-          F.foldleft.(fn, @monoids.map(&:last)).(stream).to_a
-        else
-          F.foldleft.(*@monoids.first).(stream)
-        end
-     else
-       raise "Cannot call Foldl on an object that does not have to_stream defined."
+  
+     def initialize(*monoids) # must be [fn, unit] pair, a monoid
+         @monoids = monoids
+         self
      end
-   end
-
-  @@foldl = ->(f,u) { Foldl.new([f,u])} 
-  def self.foldl
-    @@foldl
+  
+     def monoids
+       @monoids
+     end
+  
+     def *(lamb)
+       ->(x) { self.( lamb.( x ) ) }
+     end
+  
+     def |(lamb)
+       ->(x) { lamb.( self.( x ) ) }
+     end
+  
+     def <<(val)
+       self.(val.())
+     end
+  
+     def >>(lamb)
+       lamb.(self)
+     end
+  
+     def +(foldl)
+       if foldl.kind_of?(Foldl)
+         Foldl.new(*(self.monoids + foldl.monoids))
+       else
+         raise "Cannot add two non-folds together"
+       end
+     end
+  
+     def call(stream)
+       if stream.respond_to?(:to_stream)
+          if @monoids.length > 1
+            fn = ->(acc, el) { F.zip_with.(F.apply_fn).(@monoids.map(&:first), acc, @monoids.map {|x| el }).to_a }
+            F.foldleft.(fn, @monoids.map(&:last)).(stream).to_a
+          else
+            F.foldleft.(*@monoids.first).(stream)
+          end
+       else
+         raise "Cannot call Foldl on an object that does not have to_stream defined."
+       end
+     end
+  
+    @@foldl = ->(f,u) { Foldl.new([f,u])} 
+    def self.foldl
+      @@foldl
+    end
   end
-end
-
-class F
-  include Singleton
-end
-
-F.define_singleton_method(:foldl) { Foldl.foldl }
-
-class Scanl
-   alias_method :standard_ruby_kind_of?, :kind_of?
-
-   def kind_of?(clazz)
-     [Proc].include?(clazz) || standard_ruby_kind_of?(clazz)
-   end
-
-   def initialize(*monoids) # must be [fn, unit] pair, a monoid
-       @monoids = monoids
-       self
-   end
-
-   def monoids
-     @monoids
-   end
-
-   def *(lamb)
-     ->(x) { self.( lamb.( x ) ) }
-   end
-
-   def |(lamb)
-     ->(x) { lamb.( self.( x ) ) }
-   end
-
-   def <<(val)
-     self.(val.())
-   end
-
-   def >>(lamb)
-     lamb.(self)
-   end
-
-   def +(scanl)
-     if scanl.kind_of?(Scanl)
-       Scanl.new(*(self.monoids + scanl.monoids))
-     else
-       raise "Cannot add two non-folds together"
-     end
-   end
-
-   def call(stream)
-     if stream.respond_to?(:to_stream)
-        if @monoids.length > 1
-          fn = ->(acc, el) { F.zip_with.(F.apply_fn).(@monoids.map(&:first), acc, @monoids.map {|x| el }).to_a }
-          F.scanleft.(fn, @monoids.map(&:last)).(stream)
-        else
-          F.scanleft.(*@monoids.first).(stream)
-        end
-     else
-       raise "Cannot call Foldl on an object that does not have to_stream defined."
-     end
-   end
-
-  @@scanl = ->(f,u) { Scanl.new([f,u])} 
-  def self.scanl
-    @@scanl
+  
+  class F
+    include Singleton
   end
-end
-F.define_singleton_method(:scanl) { Scanl.scanl }
-
-
-class Mapl
-   alias_method :standard_ruby_kind_of?, :kind_of?
-
-   def kind_of?(clazz)
-     [Proc].include?(clazz) || standard_ruby_kind_of?(clazz)
-   end
-
-   def initialize(*functions)
-       @functions = functions
-       self
-   end
-
-   def functions
-     @functions
-   end
-
-   def *(lamb)
-     ->(x) { self.( lamb.( x ) ) }
-   end
-
-   def |(lamb)
-     ->(x) { lamb.( self.( x ) ) }
-   end
-
-   def <<(val)
-     self.(val.())
-   end
-
-   def >>(lamb)
-     lamb.(self)
-   end
-
-   def +(mapl)
-     if mapl.kind_of?(Mapl)
-       Mapl.new(*(self.functions + mapl.functions))
-     else
-       raise "Cannot add two non-maps together"
+  
+  F.define_singleton_method(:foldl) { Foldl.foldl }
+  
+  class Scanl
+     alias_method :standard_ruby_kind_of?, :kind_of?
+  
+     def kind_of?(clazz)
+       [Proc].include?(clazz) || standard_ruby_kind_of?(clazz)
      end
-   end
-
-   def call(stream)
-     if stream.respond_to?(:to_stream)
-        if @functions.length > 1
-          F.mapleft.(@functions).(stream)
-        else
-          F.mapleft.(@functions.first).(stream)
-        end
-     else
-       raise "Cannot call Mapl on an object that does not have to_stream defined."
+  
+     def initialize(*monoids) # must be [fn, unit] pair, a monoid
+         @monoids = monoids
+         self
      end
-   end
-
-  @@map = ->(f) { Mapl.new(f)} 
-  def self.map
-    @@map
+  
+     def monoids
+       @monoids
+     end
+  
+     def *(lamb)
+       ->(x) { self.( lamb.( x ) ) }
+     end
+  
+     def |(lamb)
+       ->(x) { lamb.( self.( x ) ) }
+     end
+  
+     def <<(val)
+       self.(val.())
+     end
+  
+     def >>(lamb)
+       lamb.(self)
+     end
+  
+     def +(scanl)
+       if scanl.kind_of?(Scanl)
+         Scanl.new(*(self.monoids + scanl.monoids))
+       else
+         raise "Cannot add two non-folds together"
+       end
+     end
+  
+     def call(stream)
+       if stream.respond_to?(:to_stream)
+          if @monoids.length > 1
+            fn = ->(acc, el) { F.zip_with.(F.apply_fn).(@monoids.map(&:first), acc, @monoids.map {|x| el }).to_a }
+            F.scanleft.(fn, @monoids.map(&:last)).(stream)
+          else
+            F.scanleft.(*@monoids.first).(stream)
+          end
+       else
+         raise "Cannot call Foldl on an object that does not have to_stream defined."
+       end
+     end
+  
+    @@scanl = ->(f,u) { Scanl.new([f,u])} 
+    def self.scanl
+      @@scanl
+    end
   end
+  F.define_singleton_method(:scanl) { Scanl.scanl }
+  
+  
+  class Mapl
+     alias_method :standard_ruby_kind_of?, :kind_of?
+  
+     def kind_of?(clazz)
+       [Proc].include?(clazz) || standard_ruby_kind_of?(clazz)
+     end
+  
+     def initialize(*functions)
+         @functions = functions
+         self
+     end
+  
+     def functions
+       @functions
+     end
+  
+     def *(lamb)
+       ->(x) { self.( lamb.( x ) ) }
+     end
+  
+     def |(lamb)
+       ->(x) { lamb.( self.( x ) ) }
+     end
+  
+     def <<(val)
+       self.(val.())
+     end
+  
+     def >>(lamb)
+       lamb.(self)
+     end
+  
+     def +(mapl)
+       if mapl.kind_of?(Mapl)
+         Mapl.new(*(self.functions + mapl.functions))
+       else
+         raise "Cannot add two non-maps together"
+       end
+     end
+  
+     def call(stream)
+       if stream.respond_to?(:to_stream)
+          if @functions.length > 1
+            F.mapleft.(@functions).(stream)
+          else
+            F.mapleft.(@functions.first).(stream)
+          end
+       else
+         raise "Cannot call Mapl on an object that does not have to_stream defined."
+       end
+     end
+  
+    @@map = ->(f) { Mapl.new(f)} 
+    def self.map
+      @@map
+    end
+  end
+  F.define_singleton_method(:map) { Mapl.map }  
 end
-F.define_singleton_method(:map) { Mapl.map }
