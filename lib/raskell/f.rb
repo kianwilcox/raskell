@@ -23,6 +23,7 @@ module System
         @@list||= ->(*items) { items }
       end
     end
+
     
     module ProcishLambdas
       extend self
@@ -124,7 +125,7 @@ module System
         }
       end
     end
-    
+
     module BooleanLambdas
       extend self
     
@@ -267,10 +268,77 @@ module System
     
     end
     
-    module HigherOrderStreamLambdas
+    module FoldableStreamLambdas
+      def foldleft
+        @@foldleft||= ->(f,u) { 
+        
+          ->(stream) {
+            next_item = stream.next_item
+            result = u
+            while next_item != [:done]
+              if next_item.first == :skip
+                
+              elsif next_item.first == :yield
+                result = f.(result, next_item[1])
+              else
+                raise "#{next_item} is a malformed stream response"
+              end
+              next_item = next_item.last.next_item
+            end
+            result  
+          } * to_stream
+        
+        }
+      end
+
+      def foldr
+        @@foldr||= ->(f,u) { 
+          ->(stream) {
+            next_item = stream.next_item
+            if next_item == [:done]
+              u
+            elsif next_item.first == :skip 
+              foldr.(f, u, next_item.last)
+            elsif next_item.first == :yield
+              f.(next_item[1], foldr.(f, u, next_item.last))
+            else
+              raise "#{next_item} is improperly formed for a Stream"
+            end
+          } * to_stream
+            
+        }
+      end
+
+      def partition_by
+        @@partition_by||= ->(fn) {
+          folded_filter = ->(f) { foldl.(->(acc, el) { f.(el) ?  acc << el : acc }, []) }
+          (folded_filter.(fn) + folded_filter.(->(x) { !fn.(x) })) * to_stream
+        }
+      end
+    
+      def bucket_by
+        @@bucket_by||= ->(fn, xs) {
+          foldl.(->(acc, el) { 
+              key = fn.(el)
+              acc[key] ||= []
+              acc[key] << el
+              acc 
+            }, {}).(to_stream.(xs))
+        }
+      end
+    
+      def bucket_by_and_summarize
+        @@bucket_by_and_summarize||= ->(group_fn, summary_fn) {
+          map.(summary_fn) * bucket_by.(group_fn)
+        }
+      end
+
+
+    end
+
+    module OneForOneStreamLambdas
       extend self
-    
-    
+
       def mapleft
         @@mapleft||= ->(fn) { 
             ->(stream) {
@@ -290,7 +358,73 @@ module System
             } * to_stream
         }
       end
-      
+
+      def scanleft
+        @@scanleft||= ->(f,u) { 
+          ->(stream) {
+            next_fn = ->(state) {
+              result_so_far = state.first
+              strm = state.last
+              next_item = strm.next_item
+              tag = next_item[0]
+              val = next_item[1]
+              next_stream = next_item.last
+              if tag == :done
+                [:done]
+              elsif tag == :skip
+                [:skip, Stream.new(next_fn, [result_so_far, next_stream])]
+              elsif tag == :yield
+                new_result = f.(result_so_far, val)
+                [:yield, new_result, Stream.new(next_fn, [new_result, next_stream]) ]
+              else
+                raise "#{next_item} is a malformed stream response"
+              end
+            }
+            Stream.new(next_fn, [u, stream])
+          } * to_stream
+        
+        }
+      end
+
+      def zip_with
+        @@zip_with||= ->(fn) {
+          ->(left_stream, right_stream, *streams) {
+              streams = ([left_stream, right_stream] + streams).map(&:to_stream)
+              next_fn = ->(state) {
+                val_so_far = state.first
+                strms = state.drop(1)
+                next_stream = strms.first
+                next_item = next_stream.next_item
+                new_streams = strms.drop(1) + [next_stream.next_item.last == :done ? empty : next_item.last]
+                tag = next_item.first
+                val = tag == :done ? nil : next_item[1]
+                if tag == :done
+                  [:done]
+                elsif tag == :skip
+                  [:skip, Stream.new(next_fn, [val_so_far] +  new_streams)]
+                elsif tag == :yield && val_so_far.length == streams.length - 1
+                  [:yield, fn.(*(val_so_far + [val])), Stream.new(next_fn, [[]] + new_streams)]
+                elsif tag == :yield
+                  [:skip, Stream.new(next_fn, [val_so_far + [val]] + new_streams)]
+                else
+                  raise "#{next_item} is a malformed stream response!"
+                end
+              }
+        
+              Stream.new(next_fn, [[]] + streams)
+            }
+        }
+      end
+
+      def replace_with
+        @@replace_with||= ->(to_replace_with, to_replace) { map.(->(x) { x == to_replace ? to_replace_with : x }) }
+      end
+
+    end
+    
+    module HigherOrderStreamLambdas
+      extend self
+    
       def flatmap
         @@flatmap||= ->(fn) { 
         
@@ -347,107 +481,6 @@ module System
           } * to_stream
         }
       end
-    
-      def foldleft
-        @@foldleft||= ->(f,u) { 
-        
-          ->(stream) {
-            next_item = stream.next_item
-            result = u
-            while next_item != [:done]
-              if next_item.first == :skip
-                
-              elsif next_item.first == :yield
-                result = f.(result, next_item[1])
-              else
-                raise "#{next_item} is a malformed stream response"
-              end
-              next_item = next_item.last.next_item
-            end
-            result  
-          } * to_stream
-        
-        }
-      end
-    
-      def scanleft
-        @@scanleft||= ->(f,u) { 
-          ->(stream) {
-            next_fn = ->(state) {
-              result_so_far = state.first
-              strm = state.last
-              next_item = strm.next_item
-              tag = next_item[0]
-              val = next_item[1]
-              next_stream = next_item.last
-              if tag == :done
-                [:done]
-              elsif tag == :skip
-                [:skip, Stream.new(next_fn, [result_so_far, next_stream])]
-              elsif tag == :yield
-                new_result = f.(result_so_far, val)
-                [:yield, new_result, Stream.new(next_fn, [new_result, next_stream]) ]
-              else
-                raise "#{next_item} is a malformed stream response"
-              end
-            }
-            Stream.new(next_fn, [u, stream])
-          } * to_stream
-        
-        }
-      end
-    
-      def foldr
-        @@foldr||= ->(f,u) { 
-          ->(stream) {
-            next_item = stream.next_item
-            if next_item == [:done]
-              u
-            elsif next_item.first == :skip 
-              foldr.(f, u, next_item.last)
-            elsif next_item.first == :yield
-              f.(next_item[1], foldr.(f, u, next_item.last))
-            else
-              raise "#{next_item} is improperly formed for a Stream"
-            end
-          } * to_stream
-            
-        }
-      end
-    
-      def zip_with
-        @@zip_with||= ->(fn) {
-          ->(left_stream, right_stream, *streams) {
-              streams = ([left_stream, right_stream] + streams).map(&:to_stream)
-              next_fn = ->(state) {
-                val_so_far = state.first
-                strms = state.drop(1)
-                next_stream = strms.first
-                next_item = next_stream.next_item
-                new_streams = strms.drop(1) + [next_stream.next_item.last == :done ? empty : next_item.last]
-                tag = next_item.first
-                val = tag == :done ? nil : next_item[1]
-                if tag == :done
-                  [:done]
-                elsif tag == :skip
-                  [:skip, Stream.new(next_fn, [val_so_far] +  new_streams)]
-                elsif tag == :yield && val_so_far.length == streams.length - 1
-                  [:yield, fn.(*(val_so_far + [val])), Stream.new(next_fn, [[]] + new_streams)]
-                elsif tag == :yield
-                  [:skip, Stream.new(next_fn, [val_so_far + [val]] + new_streams)]
-                else
-                  raise "#{next_item} is a malformed stream response!"
-                end
-              }
-        
-              Stream.new(next_fn, [[]] + streams)
-            }
-        }
-      end
-    
-      def replace_with
-        @@replace_with||= ->(to_replace_with, to_replace) { map.(->(x) { x == to_replace ? to_replace_with : x }) }
-      end
       
       def find_where
         @@find_where||= ->(fn){ first * filter.(fn) }
@@ -477,32 +510,8 @@ module System
         @@slice_by||= ->(starts_with_fn, ends_with_fn) { take_until.(ends_with_fn) * drop_until.(starts_with_fn) }
       end
     
-      def partition_by
-        @@partition_by||= ->(fn) {
-          folded_filter = ->(f) { foldl.(->(acc, el) { f.(el) ?  acc << el : acc }, []) }
-          (folded_filter.(fn) + folded_filter.(->(x) { !fn.(x) })) * to_stream
-        }
-      end
-    
       def split_by
         @@split_by = ->(fn) { take_while.(fn) + drop_while.(fn) }
-      end
-    
-      def bucket_by
-        @@bucket_by||= ->(fn, xs) {
-          foldl.(->(acc, el) { 
-              key = fn.(el)
-              acc[key] ||= []
-              acc[key] << el
-              acc 
-            }, {}).(to_stream.(xs))
-        }
-      end
-    
-      def bucket_by_and_summarize
-        @@bucket_by_and_summarize||= ->(group_fn, summary_fn) {
-          map.(summary_fn) * bucket_by.(group_fn)
-        }
       end
     
       def group_by
@@ -857,7 +866,7 @@ module System
         } * to_stream
       end
     
-      def interesect
+      def intersect
         @@intersect||= ->(xs) {
           ->(ys) {
               to_stream << (to_set.(xs) & to_set.(ys))
@@ -995,7 +1004,11 @@ module System
       def sum_of_differences_from_estimated_mean_two_pass
         @@sum_of_differences_from_estimated_mean||= ->(xs) { sum * map.(square * sub_by.(mean.(xs))) << xs }
       end
+
+      ## one pass might involve a scanl for (length, sum, flip * const), which is then mapped across to produce (mean, difference_from_mean, square_difference_from_mean, M2, ....), which is then scanl'd to summarize in some way, doing it all in a single pass.... I wonder if grouping the data and then transposing, and concatenating, then running the same query against it after to see how the values change as a stability measure.
     
+    #so to produce quicksort - foldl across the stream producing a tree, where inserting each element takes worst-case log(n), then call to_stream, which to produce all elements takes o(n)
+
     
     end
     
@@ -1212,6 +1225,8 @@ module System
     extend Collections::BooleanLambdas
     extend Collections::NumericLambdas
     extend Collections::StreamDropAndTakeLambdas
+    extend Collections::OneForOneStreamLambdas
+    extend Collections::FoldableStreamLambdas
     extend Collections::HigherOrderStreamLambdas
     extend Collections::NumericStreamLambdas
     extend Collections::StreamLambdas
@@ -1317,7 +1332,7 @@ end
 class Array
 
   ## Applicative <**> 
-  ## [1,2,3] ** [id, double]
+  ## [1,2,3] ^ [id, double] == [1,2,3].flatmap([id, double])
   ## [1,2,2,4,3,6]
   def ^(arr, is_cartesian=false)
     is_cartesian || !arr.any?{|x| x.kind_of? Proc } ? self.cartesian_product(arr) : F.flatmap.(->(x) { arr.to_stream.(x) }).(self).to_a
@@ -1330,7 +1345,7 @@ class Array
   end
 
   ## zip or Applicative <*> depending on if there any function values in the array/stream
-  #[id, double] * [1,2,3]
+  #[id, double] ** [1,2,3]
   #[1,2,3,2,4,6]
   def **(arr, is_zip=false)
     is_zip || !self.any?{|x| x.kind_of? Proc } ? self.zip(arr.to_a) : F.flatmap.(->(f) { F.map.(f) << arr.to_stream }).(self.to_stream).to_a
