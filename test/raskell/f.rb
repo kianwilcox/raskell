@@ -1277,7 +1277,7 @@ tests = [
 
     ->() { 
       f = F.scanl.(F.plus, 0)
-      check.("equal", f.([1,2,3,4]), [1,3,6,10])
+      check.("equal", f.([1,2,3,4]), [0, 1,3,6,10])
       check.("equal", f.([1,2,3,4]).class, Stream)
     }
 

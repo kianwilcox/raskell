@@ -49,16 +49,16 @@ tests = [
       maximum = F.scanl.(F.max, F.negative_infinity)
       minimum = F.scanl.(F.min, F.infinity)
 
-      f1 = sum + product + maximum + minimum
+      f1 = F.rest * (sum + product + maximum + minimum)
       check.("equal", f1.([5,5,5,1]), [[5, 5, 5, 5], [10, 25, 5, 5], [15, 125, 5, 5], [16, 125, 5, 1]])
 
-      f2 = (sum + product) + (maximum + minimum)
+      f2 = F.rest * ((sum + product) + (maximum + minimum))
       check.("equal", f2.([5,5,5,1]), [[5, 5, 5, 5], [10, 25, 5, 5], [15, 125, 5, 5], [16, 125, 5, 1]])
 
-      f3 = (((sum + product) + maximum) + minimum)
+      f3 = F.rest * (((sum + product) + maximum) + minimum)
       check.("equal", f3.([5,5,5,1]), [[5, 5, 5, 5], [10, 25, 5, 5], [15, 125, 5, 5], [16, 125, 5, 1]])
 
-      f4 = (sum + (product + (maximum + minimum)))
+      f4 = F.rest * (sum + (product + (maximum + minimum)))
       check.("equal", f4.([5,5,5,1]), [[5, 5, 5, 5], [10, 25, 5, 5], [15, 125, 5, 5], [16, 125, 5, 1]])
     }
 

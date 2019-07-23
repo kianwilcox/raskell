@@ -380,9 +380,15 @@ module System
                 raise "#{next_item} is a malformed stream response"
               end
             }
-            Stream.new(next_fn, [u, stream])
+            cons.(u, Stream.new(next_fn, [u, stream]))
           } * to_stream
         
+        }
+      end
+
+      def scannable_map
+        @@scannable_map||= ->(f) {
+          scanleft.(->(acc, el) { f.(el) }, Nothing)
         }
       end
 
@@ -481,11 +487,17 @@ module System
           } * to_stream
         }
       end
+
+
       
       def find_where
         @@find_where||= ->(fn){ first * filter.(fn) }
       end
       
+      def find
+        @@find||= ->(x){ first * filter.(F.equal.(x)) }
+      end
+
       def find_last_where
         @@find_last_where||= ->(fn){ last * filter.(fn) }
       end
@@ -899,7 +911,7 @@ module System
     
       def window
         @@window||= ->(n) {
-          map.(take.(n)) * suffixes
+          F.take_while.(F.equal.(n) * F.length) * map.(take.(n)) * suffixes
         }
       end
     
@@ -1341,7 +1353,7 @@ class Array
   ## cartesian product
 
   def cartesian_product(arr)
-    self.map {|x| arr.to_a.map { |y| [x,y] } }.foldl(->(acc,el) { acc.push(el) }, [])
+    F.cartesian_product.(self, arr).to_a#self.flatmap {|x| arr.to_a.map { |y| [x,y] } }.foldl(->(acc,el) { acc.push(el) }, [])
   end
 
   ## zip or Applicative <*> depending on if there any function values in the array/stream
@@ -1349,6 +1361,10 @@ class Array
   #[1,2,3,2,4,6]
   def **(arr, is_zip=false)
     is_zip || !self.any?{|x| x.kind_of? Proc } ? self.zip(arr.to_a) : F.flatmap.(->(f) { F.map.(f) << arr.to_stream }).(self.to_stream).to_a
+  end
+
+  def *(arr)
+    ##F.interleave.(self.to_stream, arr.to_stream)
   end
 
 
