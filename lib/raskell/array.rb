@@ -11,7 +11,7 @@ class Array
   end
 
   def fmap(fn)
-    map {|x| fn.(x) }
+    map {|x| x.fmap(fn) }
   end
 
   def call(*args)
@@ -160,6 +160,10 @@ end
 
 
 class Hash
+  
+  def fmap(fn)
+    self.to_a.map { |x| [x[0], x[1].fmap(fn)] }.to_h
+  end
 
   def <<(keyval)
     raise("Can only push pairs into a dictionary") unless (keyval.kind_of?(Array) || keyval.kind_of?(Stream))
